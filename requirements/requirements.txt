@@ -1,0 +1,5 @@
+django==4.2
+django-crispy-forms
+oauth2
+Pillow
+psycopg2
