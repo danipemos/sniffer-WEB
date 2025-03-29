@@ -10,14 +10,14 @@ class UserAdmin(BaseUserAdmin):
     add_form = UserCreationForm
     form = UserChangeForm
 
-    list_display = ["username", "is_superuser"]
-    list_filter = ["is_superuser"]
+    list_display = ["username", "is_superuser","is_active", "date_joined", "last_login"]
+    list_filter = ["is_superuser", "is_active"]
     
     # Campos que se mostrarán al editar un usuario
     fieldsets = [
-        (None, {"fields": ["username", "password"]}),
+        (None, {"fields": ["username"]}),
         ("Permissions", {"fields": ["is_active", "is_superuser"]}),
-        ("Important dates", {"fields": ["last_login", "date_joined"]}),
+        ("Change Password", {"fields": ["new_password1", "new_password2"]}),
     ]
     
     # Campos que se mostrarán al crear un usuario
@@ -26,7 +26,7 @@ class UserAdmin(BaseUserAdmin):
             None,
             {
                 "classes": ["wide"],
-                "fields": ["username", "password1", "password2"],
+                "fields": ["username", "password1", "password2", "is_superuser"],
             },
         ),
     ]

@@ -13,8 +13,6 @@ class OurUserManager(BaseUserManager):
 
     def create_superuser(self, username, password=None):
         user = self.create_user(username, password)
-        user.is_admin = True
-        user.is_staff = True
         user.is_superuser = True
         user.save(using=self._db)
         return user
@@ -33,6 +31,10 @@ class OurUser(AbstractBaseUser):
         return self.is_superuser
 
     def has_module_perms(self, app_label):
+        return self.is_superuser
+    
+    @property
+    def is_staff(self):
         return self.is_superuser
 
     def __str__(self):
