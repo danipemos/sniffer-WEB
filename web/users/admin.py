@@ -10,13 +10,12 @@ class UserAdmin(BaseUserAdmin):
     add_form = UserCreationForm
     form = UserChangeForm
 
-    list_display = ["username", "is_superuser","is_active", "date_joined", "last_login"]
-    list_filter = ["is_superuser", "is_active"]
-    
+    list_display = ["username"]
+    list_filter = []
+
     # Campos que se mostrarán al editar un usuario
     fieldsets = [
         (None, {"fields": ["username"]}),
-        ("Permissions", {"fields": ["is_active", "is_superuser"]}),
         ("Change Password", {"fields": ["new_password1", "new_password2"]}),
     ]
     
@@ -26,7 +25,7 @@ class UserAdmin(BaseUserAdmin):
             None,
             {
                 "classes": ["wide"],
-                "fields": ["username", "password1", "password2", "is_superuser"],
+                "fields": ["username", "password1", "password2"],
             },
         ),
     ]

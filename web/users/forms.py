@@ -8,7 +8,7 @@ class UserChangeForm(forms.ModelForm):
     new_password2 = forms.CharField(label="Confirm New Password", widget=forms.PasswordInput, required=False)
     class Meta:
         model = OurUser
-        fields = ("username", "is_active", "is_superuser")
+        fields = ("username", "new_password1", "new_password2")
 
     def clean_username(self):
         cleaned_data = super().clean()
@@ -37,7 +37,6 @@ class UserChangeForm(forms.ModelForm):
 class UserCreationForm(forms.ModelForm):
     password1 = forms.CharField(label="Password", widget=forms.PasswordInput, required=True)
     password2 = forms.CharField(label="Confirm Password", widget=forms.PasswordInput, required=True)
-    is_superuser = forms.BooleanField(label="Superuser", required=False, initial=False)
     username = forms.CharField(label="Username", max_length=150, required=True)
 
     username.widget.attrs.update({"placeholder": "Username"})
@@ -46,13 +45,12 @@ class UserCreationForm(forms.ModelForm):
 
     class Meta:
         model = OurUser
-        fields = ("username", "password1", "password2", "is_superuser")
+        fields = ("username", "password1", "password2")
 
     def save(self, commit=True):
         user = super().save(commit=False)
         user.set_password(self.cleaned_data["password1"])
         user.username = self.cleaned_data["username"]
-        user.is_superuser = self.cleaned_data.get("is_superuser", False)
         if commit:
             user.save()
         return user
