@@ -1,6 +1,8 @@
 from django.urls import path
 from . import views
 
+app_name = "monitorize"
+
 urlpatterns = [
     path('', views.home, name='home'),
     path('add-user/', views.add_user, name='add_user'),

@@ -47,14 +47,6 @@ class UserCreationForm(forms.ModelForm):
         model = OurUser
         fields = ("username", "password1", "password2")
 
-    def save(self, commit=True):
-        user = super().save(commit=False)
-        user.set_password(self.cleaned_data["password1"])
-        user.username = self.cleaned_data["username"]
-        if commit:
-            user.save()
-        return user
-    
     def clean_password(self):
         password1 = self.cleaned_data.get("password1")
         password2 = self.cleaned_data.get("password2")
@@ -67,6 +59,15 @@ class UserCreationForm(forms.ModelForm):
         if OurUser.objects.filter(username=username).exists():
             raise ValidationError("Username already exists.")
         return username
+    
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        user.set_password(self.cleaned_data["password1"])
+        user.username = self.cleaned_data["username"]
+        if commit:
+            user.save()
+        return user
+    
 
 class LoginForm(forms.Form):
     username = forms.CharField(label="Username", max_length=150, required=True)

@@ -8,6 +8,18 @@ class DeviceChangeForm(forms.ModelForm):
         model = Device
         fields = ("hostname", "ip", "username", "password", "descripcion")
 
+    def clean_hostname(self):
+        hostname = self.cleaned_data.get("hostname")
+        if Device.objects.filter(hostname=hostname).exists():
+            raise ValidationError("A device with this hostname already exists.")
+        return hostname
+    
+    def clean_ip(self):
+        ip = self.cleaned_data.get("ip")
+        if Device.objects.filter(ip=ip).exists():
+            raise ValidationError("A device with this IP address already exists.")
+        return ip
+
     def save(self, commit=True):
         device = super().save(commit=False)
         device.hostname = self.cleaned_data["hostname"]
@@ -35,6 +47,17 @@ class DeviceCreationForm(forms.ModelForm):
         model = Device
         fields = ("hostname", "ip", "username", "password", "descripcion")
 
+    def clean_hostname(self):
+        hostname = self.cleaned_data.get("hostname")
+        if Device.objects.filter(hostname=hostname).exists():
+            raise ValidationError("A device with this hostname already exists.")
+        return hostname
+    
+    def clean_ip(self):
+        ip = self.cleaned_data.get("ip")
+        if Device.objects.filter(ip=ip).exists():
+            raise ValidationError("A device with this IP address already exists.")
+        return ip
     def save(self, commit=True):
         device = super().save(commit=False)
         device.hostname = self.cleaned_data["hostname"]
@@ -50,6 +73,18 @@ class PrivateKeyChangeForm(forms.ModelForm):
     class Meta:
         model = PrivateKey
         fields = ("name", "key")
+
+    def clean_name(self):
+        name = self.cleaned_data.get("name")
+        if PrivateKey.objects.filter(name=name).exists():
+            raise ValidationError("A private key with this name already exists.")
+        return name
+        
+    def clean_key(self):
+        key = self.cleaned_data.get("key")
+        if PrivateKey.objects.filter(key=key).exists():
+            raise ValidationError("A private key with this file already exists.")
+        return key
 
     def save(self, commit=True):
         private_key = super().save(commit=False)
@@ -73,6 +108,18 @@ class PrivateKeyCreationForm(forms.ModelForm):
     class Meta:
         model = PrivateKey
         fields = ("name", "key")
+
+    def clean_name(self):
+        name = self.cleaned_data.get("name")
+        if PrivateKey.objects.filter(name=name).exists():
+            raise ValidationError("A private key with this name already exists.")
+        return name
+        
+    def clean_key(self):
+        key = self.cleaned_data.get("key")
+        if PrivateKey.objects.filter(key=key).exists():
+            raise ValidationError("A private key with this file already exists.")
+        return key
 
     def save(self, commit=True):
         private_key = super().save(commit=False)
