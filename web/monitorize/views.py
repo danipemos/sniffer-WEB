@@ -1,6 +1,7 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from .forms import DeviceCreationForm, PrivateKeyCreationForm
+from .models import Device
 from users.forms import UserCreationForm
 
 @login_required
@@ -70,3 +71,7 @@ def add_device(request):
             })
     else:
         return redirect("monitorize:home")
+
+def ssh_terminal_view(request, device_id):
+    device = get_object_or_404(Device, id=device_id)
+    return render(request, "ssh_terminal.html", {"device": device})

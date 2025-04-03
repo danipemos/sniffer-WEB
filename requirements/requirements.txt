@@ -3,3 +3,6 @@ django-crispy-forms
 oauth2
 Pillow
 psycopg2
+channels
+paramiko
+whitenoise
