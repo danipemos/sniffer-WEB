@@ -14,6 +14,7 @@
             <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#userModal">Add User</button>
             <button class="btn btn-secondary" data-bs-toggle="modal" data-bs-target="#privateKeyModal">Add Private Key</button>
             <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#deviceModal">Add Device</button>
+            <a href="{% url 'monitorize:device_list' %}" class="btn btn-info">View Devices</a>
         </div>
     </div>
 
@@ -38,13 +39,13 @@
                         <div class="form-group">
                             {{ user_form.password1.label_tag }}
                             {{ user_form.password1 }}
-                            {% if user_form.password1.errors %}
-                                <p class="error text-danger">{{ user_form.password1.errors.0 }}</p>
-                            {% endif %}
                         </div>
                         <div class="form-group">
                             {{ user_form.password2.label_tag }}
                             {{ user_form.password2 }}
+                            {% if user_form.password2.errors %}
+                            <p class="error text-danger">{{ user_form.password2.errors.0 }}</p>
+                            {% endif %}
                         </div>
                         {% for error in user_form.non_field_errors %}
                             <p class="error text-danger">{{ error }}</p>

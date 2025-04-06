@@ -6,13 +6,26 @@ from asgiref.sync import sync_to_async
 
 class SSHConsumer(AsyncWebsocketConsumer):
     async def connect(self):
-        self.device_id = self.scope['url_route']['kwargs']['device_id']
+        self.hostname = self.scope['url_route']['kwargs']['hostname']
         self.ssh_client = None
         self.channel = None
 
         # Obtener los detalles del dispositivo
         from .models import Device
-        self.device = await sync_to_async(Device.objects.get)(id=self.device_id)
+        self.device = await sync_to_async(Device.objects.get)(hostname=self.hostname)
+
+        # Obtener credenciales de cookies
+        session = self.scope["session"]
+        username = session.get(f"{self.hostname}_username")
+        password = session.get(f"{self.hostname}_password")
+
+        # Aceptar la conexión antes de enviar mensajes
+        await self.accept()
+
+        if not username or not password:
+            await self.send("Error: Missing credentials.")
+            await self.close()
+            return
 
         try:
             # Configurar la conexión SSH
@@ -20,14 +33,13 @@ class SSHConsumer(AsyncWebsocketConsumer):
             self.ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             self.ssh_client.connect(
                 hostname=self.device.ip,
-                username=self.device.username,
-                password=self.device.password
+                username=username,
+                password=password
             )
 
             # Abrir un canal interactivo
             self.channel = self.ssh_client.invoke_shell(term='xterm-256color', width=120, height=40)
             self.channel.settimeout(0.0)
-            await self.accept()
 
             # Leer la salida inicial del shell
             asyncio.create_task(self.read_from_channel())

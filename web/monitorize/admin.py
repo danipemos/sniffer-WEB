@@ -6,18 +6,16 @@ from .models import Device, PrivateKey
 class DeviceAdmin(admin.ModelAdmin):
     form = DeviceChangeForm
     add_form = DeviceCreationForm
-    list_display = ["hostname", "ip", "username", "password", "descripcion", "date_joined"]  # Corrected field name
-    search_fields = ["hostname", "ip", "username"]
+    list_display = ["hostname", "ip", "descripcion"]  # Corrected field name
+    search_fields = ["hostname", "ip"]
     ordering = ["hostname"]
     filter_horizontal = []
     fieldsets = [
         (None, {"fields": ["hostname", "ip"]}),
-        ("Credentials", {"fields": ["username", "password"]}),
         ("Description", {"fields": ["descripcion"]}),
     ]
     add_fieldsets = [
         (None, {"classes": ["wide"], "fields": ["hostname", "ip"]}),
-        ("Credentials", {"fields": ["username", "password"]}),
         ("Description", {"fields": ["descripcion"]}),
     ]
 
@@ -25,7 +23,7 @@ class DeviceAdmin(admin.ModelAdmin):
 class PrivateKeyAdmin(admin.ModelAdmin):
     form = PrivateKeyChangeForm
     add_form = PrivateKeyCreationForm
-    list_display = ["name", "key", "date_joined"]  # Corrected field name
+    list_display = ["name", "key"]  # Corrected field name
     search_fields = ["name", "key"]
     ordering = ["name"]
     filter_horizontal = []

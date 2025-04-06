@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Device Detail</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script> <!-- jQuery necesario para Bootstrap y eventos -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css">
+    <style>
+    </style>
+</head>
+<body>
+    <div class="container mt-5">
+        <h1 class="text-center">Device Details</h1>
+        <div class="card mt-4">
+            <div class="card-body">
+                <h5 class="card-title">Hostname: {{ device.hostname }}</h5>
+                <p class="card-text"><strong>IP Address:</strong> {{ device.ip }}</p>
+                <p class="card-text"><strong>Description:</strong> {{ device.descripcion }}</p>
+            </div>
+        </div>
+        <div class="text-center mt-4">
+            <a href="{% url 'monitorize:device_list' %}" class="btn btn-primary">Back to Device List</a>
+            <!-- Botón para abrir el modal -->
+            <button type="button" class="btn btn-secondary" id="openSshTerminal">
+                Open SSH Terminal
+            </button>
+        </div>
+        <div class="text-center mt-4">
+            <button type="button" class="btn btn-warning" id="openEditFileModal">Edit File</button>
+        </div>
+    </div>
+
+    <!-- Modal para formulario de credenciales -->
+    <div class="modal fade" id="credentialsModal" tabindex="-1" aria-labelledby="credentialsModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="credentialsModalLabel">Set Credentials</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="setCredentialsForm">
+                        <div class="mb-3">
+                            <label for="username" class="form-label">Username</label>
+                            <input type="text" class="form-control" id="username" name="username" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="password" class="form-label">Password</label>
+                            <input type="password" class="form-control" id="password" name="password" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Save Credentials</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para Open SSH Terminal -->
+    <div class="modal fade" id="sshTerminalModal" tabindex="-1" aria-labelledby="sshTerminalModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="sshTerminalModalLabel">SSH Terminal</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="terminal-container" style="height: 600px; width: 100%; overflow: hidden; background-color: black;"></div>
+                    <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
+                    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para editar archivo -->
+    <div class="modal fade" id="editFileModal" tabindex="-1" aria-labelledby="editFileModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editFileModalLabel">Edit File</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="editFileForm">
+                        <div class="mb-3">
+                            <label for="fileContent" class="form-label">File Content</label>
+                            <textarea class="form-control" id="fileContent" name="fileContent" rows="15" required></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Save Changes</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const missingCredentials = {{ missing_credentials|yesno:"true,false" }};
+            const editFileModal = new bootstrap.Modal(document.getElementById("editFileModal"));
+            const credentialsModal = new bootstrap.Modal(document.getElementById("credentialsModal"));
+
+            // Abrir el modal para editar archivo
+            document.getElementById("openEditFileModal").addEventListener("click", function () {
+                if (missingCredentials) {
+                    // Mostrar el modal de credenciales si faltan
+                    credentialsModal.show();
+                } else {
+                    // Intentar cargar el contenido del archivo si las credenciales están presentes
+                    fetch(`{% url 'monitorize:edit_file' device.hostname %}`)
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.error) {
+                                alert(data.error);
+                            } else {
+                                document.getElementById("fileContent").value = data.fileContent;
+                                editFileModal.show();
+                            }
+                        });
+                }
+            });
+
+            // Manejar el envío del formulario de credenciales
+            document.getElementById("setCredentialsForm").addEventListener("submit", function (e) {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+
+                fetch("{% url 'monitorize:set_credentials' device.hostname %}", {
+                    method: "POST",
+                    body: formData,
+                    headers: { "X-CSRFToken": "{{ csrf_token }}" }
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.error) {
+                            alert(data.error);
+                        } else {
+                            location.reload(); // Recargar la página para actualizar el estado de las credenciales
+                        }
+                    });
+            });
+
+            // Manejar el envío del formulario para guardar cambios en el archivo
+            document.getElementById("editFileForm").addEventListener("submit", function (e) {
+                e.preventDefault();
+
+                const formData = new FormData(e.target);
+
+                fetch("{% url 'monitorize:edit_file' device.hostname %}", {
+                    method: "POST",
+                    body: formData,
+                    headers: { "X-CSRFToken": "{{ csrf_token }}" }
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.error) {
+                            alert(data.error);
+                        } else {
+                            editFileModal.hide();
+                        }
+                    });
+            });
+
+            let socket = null; // Declarar el socket fuera del alcance del evento
+
+            // Manejar el clic en el botón "Open SSH Terminal"
+            document.getElementById("openSshTerminal").addEventListener("click", function () {
+                if (missingCredentials) {
+                    // Mostrar el modal de credenciales si faltan
+                    const credentialsModal = new bootstrap.Modal(document.getElementById("credentialsModal"));
+                    credentialsModal.show();
+                } else {
+                    // Mostrar el modal del terminal si las credenciales están presentes
+                    const sshTerminalModal = new bootstrap.Modal(document.getElementById("sshTerminalModal"));
+                    sshTerminalModal.show();
+
+                    // Conectar el WebSocket solo cuando se abra el modal
+                    if (!socket) {
+                        socket = new WebSocket(`ws://${window.location.host}/ws/ssh/{{ device.hostname }}/`);
+
+                        // Inicializar xterm.js
+                        const terminalContainer = document.getElementById('terminal-container');
+                        const term = new Terminal({
+                            cursorBlink: true,
+                            cols: 120,
+                            rows: 40,
+                        });
+
+                        // Usar el complemento fit para ajustar el tamaño
+                        const fitAddon = new FitAddon.FitAddon();
+                        term.loadAddon(fitAddon);
+                        term.open(terminalContainer);
+
+                        // Ajustar el tamaño del terminal al contenedor
+                        fitAddon.fit();
+
+                        // Manejar mensajes entrantes
+                        socket.onmessage = function (event) {
+                            term.write(event.data);
+                        };
+
+                        socket.onclose = function () {
+                            term.write('\r\nConnection closed.');
+                        };
+
+                        // Enviar datos al servidor
+                        term.onData(data => {
+                            socket.send(data);
+                        });
+
+                    }
+                }
+            });
+        });
+    </script>
+</body>
+</html>
