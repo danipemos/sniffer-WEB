@@ -1,5 +1,5 @@
 from django import forms
-from .models import Device, PrivateKey
+from .models import Device, PrivateKey, File
 from django.core.exceptions import ValidationError
 import os
 
@@ -120,3 +120,36 @@ class PrivateKeyCreationForm(forms.ModelForm):
         if commit:
             private_key.save()
         return private_key
+
+class FileCreationForm(forms.ModelForm):
+    file = forms.FileField(label="file", required=True)
+    file.widget.attrs.update({"placeholder": "file"})
+    device = forms.ModelChoiceField(queryset=Device.objects.all(), label="device", required=True)
+    device.widget.attrs.update({"placeholder": "device"})
+    class Meta:
+        model = File
+        fields = ("file", "device")
+    
+    def save(self, commit = True):
+        file= super().save(commit)
+        file.file = self.cleaned_data["file"]
+        file.device = self.cleaned_data["device"]
+        file.name = self.cleaned_data["file"].name
+        if commit:
+            file.save()
+        return file
+    
+
+class FileChangeForm(forms.ModelForm):
+    class Meta:
+        model = File
+        fields = ("file","device")
+    
+    def save(self, commit = True):
+        file= super().save(commit)
+        file.file = self.cleaned_data["file"]
+        file.device = self.cleaned_data["device"]
+        file.name = self.cleaned_data["file"].name
+        if commit:
+            file.save()
+        return file

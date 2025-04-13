@@ -1,6 +1,6 @@
 from django.contrib import admin
-from .forms import DeviceChangeForm, DeviceCreationForm, PrivateKeyChangeForm, PrivateKeyCreationForm
-from .models import Device, PrivateKey
+from .forms import DeviceChangeForm, DeviceCreationForm, PrivateKeyChangeForm, PrivateKeyCreationForm, FileCreationForm, FileChangeForm
+from .models import Device, PrivateKey,File
 
 
 class DeviceAdmin(admin.ModelAdmin):
@@ -34,6 +34,19 @@ class PrivateKeyAdmin(admin.ModelAdmin):
         (None, {"classes": ["wide"], "fields": ["name", "key"]}),
     ]
 
-
+class FileAdmin(admin.ModelAdmin):
+    form = FileChangeForm
+    add_form = FileCreationForm
+    list_display = ["name","file", "device", "encryption"]
+    search_fields = ["name","file","device"]
+    ordering = ["name"]
+    filter_horizontal = []
+    fieldsets = [
+        (None, {"fields": ["file", "device", ]}),
+    ]
+    add_fieldsets = [
+        (None, {"classes": ["wide"], "fields": ["file", "device", ]}),
+    ]
+admin.site.register(File, FileAdmin)
 admin.site.register(Device, DeviceAdmin)
 admin.site.register(PrivateKey, PrivateKeyAdmin)

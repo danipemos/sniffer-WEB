@@ -1,12 +1,14 @@
 import asyncio
 import paramiko
 import re
+import json
 from channels.generic.websocket import AsyncWebsocketConsumer
 from asgiref.sync import sync_to_async
 
 class SSHConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         self.hostname = self.scope['url_route']['kwargs']['hostname']
+
         self.ssh_client = None
         self.channel = None
 
@@ -19,8 +21,6 @@ class SSHConsumer(AsyncWebsocketConsumer):
         username = session.get(f"{self.hostname}_username")
         password = session.get(f"{self.hostname}_password")
 
-        # Aceptar la conexión antes de enviar mensajes
-        await self.accept()
 
         if not username or not password:
             await self.send("Error: Missing credentials.")
@@ -64,3 +64,41 @@ class SSHConsumer(AsyncWebsocketConsumer):
                 output = self.channel.recv(1024).decode('utf-8')
                 await self.send(output)  # Enviar la salida al cliente sin filtrar
             await asyncio.sleep(0.1)
+
+
+class StatsConsumer(AsyncWebsocketConsumer):
+    async def connect(self):
+        self.hostname = self.scope['url_route']['kwargs']['hostname']
+        self.stats_group_name = f"stats_{self.hostname}"
+
+        # Unirse al grupo de WebSocket
+        await self.channel_layer.group_add(self.stats_group_name, self.channel_name)
+        await self.accept()
+
+    async def disconnect(self, close_code):
+        # Salir del grupo de WebSocket
+        await self.channel_layer.group_discard(self.stats_group_name, self.channel_name)
+
+    async def send_stats(self, event):
+        # Enviar estadísticas al cliente
+        stats = event['data']
+        await self.send(text_data=json.dumps({'type': 'stats', 'data': stats}))
+
+
+class FileConsumer(AsyncWebsocketConsumer):
+    async def connect(self):
+        self.hostname = self.scope['url_route']['kwargs']['hostname']
+        self.files_group_name = f"files_{self.hostname}"
+
+        # Unirse al grupo de WebSocket
+        await self.channel_layer.group_add(self.files_group_name, self.channel_name)
+        await self.accept()
+
+    async def disconnect(self, close_code):
+        # Salir del grupo de WebSocket
+        await self.channel_layer.group_discard(self.files_group_name, self.channel_name)
+
+    async def new_file(self, event):
+        # Enviar información del nuevo archivo al cliente
+        file_data = event['data']
+        await self.send(text_data=json.dumps({'type': 'new_file', 'data': file_data}))

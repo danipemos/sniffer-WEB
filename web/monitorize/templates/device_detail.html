@@ -21,6 +21,59 @@
                 <p class="card-text"><strong>Description:</strong> {{ device.descripcion }}</p>
             </div>
         </div>
+
+        <!-- Contenedor para estadísticas -->
+        <div class="mt-4" id="stats-container" style="display: none;">
+            <h3>Real-Time Statistics</h3>
+            <ul id="stats">
+                <li>Packets per Protocol: <pre id="packets_per_protocol">-</pre></li>
+                <li>Total Time: <span id="total_time">-</span> seconds</li>
+                <li>Total MegaBytes: <span id="total_megabytes">-</span> MB</li>
+                <li>Average Bandwidth: <span id="average_bandwidth">-</span> Mbps</li>
+                <li>Sessions: <pre id="sessions">-</pre></li>
+            </ul>
+        </div>
+        <div id="file-lists">
+            <h3>Uploaded Files</h3>
+            <div>
+                <h4>Encrypted Files</h4>
+                <ul id="encrypted-files">
+                    {% for file in encrypted_files %}
+                    <li>
+                        {{ file.name }}
+                        <a href="{{ file.file.url }}" class="btn btn-sm btn-primary ms-2" download="{{ file.name }}">Download</a>
+                        <button class="btn btn-sm btn-warning ms-2 decrypt-encrypted-btn" data-file-id="{{ file.id }}">Decrypt</button>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            <div>
+                <h4>ZIP Files</h4>
+                <ul id="zip-files">
+                    <!-- Archivos ZIP desde la base de datos -->
+                    {% for file in zip_files %}
+                    <li>
+                        {{ file.name }}
+                        <a href="{{ file.file.url }}" class="btn btn-sm btn-primary ms-2" download="{{ file.name }}">Download</a>
+                        <button class="btn btn-sm btn-warning ms-2 decrypt-zip-btn" data-file-id="{{ file.id }}">Decrypt</button>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            <div>
+                <h4>Decrypted Files</h4>
+                <ul id="decrypted-files">
+                    <!-- Archivos desencriptados desde la base de datos -->
+                    {% for file in decrypted_files %}
+                    <li>
+                        {{ file.name }}
+                        <a href="{{ file.file.url }}" class="btn btn-sm btn-primary ms-2" download="{{ file.name }}">Download</a>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+
         <div class="text-center mt-4">
             <a href="{% url 'monitorize:device_list' %}" class="btn btn-primary">Back to Device List</a>
             <!-- Botón para abrir el modal -->
@@ -30,6 +83,10 @@
         </div>
         <div class="text-center mt-4">
             <button type="button" class="btn btn-warning" id="openEditFileModal">Edit File</button>
+        </div>
+        <div class="text-center mt-4">
+            <button type="button" class="btn btn-success" id="startServiceButton">Start Service</button>
+            <button type="button" class="btn btn-danger" id="stopServiceButton">Stop Service</button>
         </div>
     </div>
 
@@ -91,6 +148,56 @@
                         </div>
                         <button type="submit" class="btn btn-primary">Save Changes</button>
                     </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para introducir la contraseña -->
+    <div class="modal fade" id="decryptZipModal" tabindex="-1" aria-labelledby="decryptZipModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="decryptZipModalLabel">Decrypt ZIP File</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="decryptZipForm">
+                        <input type="hidden" id="fileId" name="fileId">
+                        <div class="mb-3">
+                            <label for="password" class="form-label">Password</label>
+                            <input type="password" class="form-control" id="password" name="password" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Decrypt</button>
+                    </form>
+                    <div id="decryptError" class="text-danger mt-2" style="display: none;">Invalid password. Please try again.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para desencriptar archivos encrypted -->
+    <div class="modal fade" id="decryptEncryptedModal" tabindex="-1" aria-labelledby="decryptEncryptedModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="decryptEncryptedModalLabel">Decrypt Encrypted File</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="decryptEncryptedForm">
+                        <input type="hidden" id="encryptedFileId" name="fileId">
+                        <div class="mb-3">
+                            <label for="privateKeyId" class="form-label">Select Private Key</label>
+                            <select class="form-select" id="privateKeyId" name="privateKeyId" required>
+                                {% for key in private_keys %}
+                                <option value="{{ key.id }}">{{ key.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Decrypt</button>
+                    </form>
+                    <div id="decryptEncryptedError" class="text-danger mt-2" style="display: none;">An error occurred. Please try again.</div>
                 </div>
             </div>
         </div>
@@ -213,7 +320,229 @@
                     }
                 }
             });
+
+            const startServiceButton = document.getElementById("startServiceButton");
+            const stopServiceButton = document.getElementById("stopServiceButton");
+            const statsContainer = document.getElementById("stats-container");
+
+            // Función para actualizar el estado del servicio
+            function updateServiceStatus() {
+                fetch(`{% url 'monitorize:service_status' device.hostname %}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.error) {
+                            alert(data.error);
+                        } else {
+                            if (data.status === "active") {
+                                startServiceButton.disabled = true;
+                                startServiceButton.classList.add("disabled");
+                                startServiceButton.style.opacity = "0.5";
+                                stopServiceButton.disabled = false;
+                                stopServiceButton.classList.remove("disabled");
+                                stopServiceButton.style.opacity = "1";
+                                statsContainer.style.display = "block"; // Mostrar estadísticas
+                            } else {
+                                startServiceButton.disabled = false;
+                                startServiceButton.classList.remove("disabled");
+                                startServiceButton.style.opacity = "1";
+                                stopServiceButton.disabled = true;
+                                stopServiceButton.classList.add("disabled");
+                                stopServiceButton.style.opacity = "0.5";
+                                statsContainer.style.display = "none"; // Ocultar estadísticas
+                            }
+                        }
+                    });
+            }
+
+            // Manejar clic en el botón "Start Service"
+            startServiceButton.addEventListener("click", function () {
+                if (missingCredentials) {
+                    const credentialsModal = new bootstrap.Modal(document.getElementById("credentialsModal"));
+                    credentialsModal.show();
+                } else {
+                    fetch(`{% url 'monitorize:start_service' device.hostname %}`, {
+                        method: "POST",
+                        headers: { "X-CSRFToken": "{{ csrf_token }}" }
+                    })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.error) {
+                                alert(data.error);
+                            } else {
+                                updateServiceStatus();
+                            }
+                        });
+                }
+            });
+
+            // Manejar clic en el botón "Stop Service"
+            stopServiceButton.addEventListener("click", function () {
+                if (missingCredentials) {
+                    const credentialsModal = new bootstrap.Modal(document.getElementById("credentialsModal"));
+                    credentialsModal.show();
+                } else {
+                    fetch(`{% url 'monitorize:stop_service' device.hostname %}`, {
+                        method: "POST",
+                        headers: { "X-CSRFToken": "{{ csrf_token }}" }
+                    })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.error) {
+                                alert(data.error);
+                            } else {
+                                updateServiceStatus();
+                            }
+                        });
+                }
+            });
+
+            // Mostrar mensaje inicial si faltan credenciales
+            if (!missingCredentials) {
+                // Actualizar el estado del servicio al cargar la página
+                updateServiceStatus();
+
+                // Actualizar el estado del servicio cada 5 segundos
+                setInterval(updateServiceStatus, 500);
+            }
+
+            const statsSocket = new WebSocket(`ws://${window.location.host}/ws/stats/{{ device.hostname }}/`);
+
+            statsSocket.onmessage = function (event) {
+                const data = JSON.parse(event.data);
+                if (data.type === "stats") {
+                    document.getElementById("packets_per_protocol").textContent = data.data.packets_per_protocol || "-";
+                    document.getElementById("total_time").textContent = data.data.total_time || "-";
+                    document.getElementById("total_megabytes").textContent = data.data.total_megabytes || "-";
+                    document.getElementById("average_bandwidth").textContent = data.data.average_bandwidth || "-";
+                    document.getElementById("sessions").textContent = data.data.sessions || "-";
+                }
+            };
+
+            statsSocket.onclose = function () {
+                console.error("WebSocket connection closed.");
+            };
+
+            const filesSocket = new WebSocket(`ws://${window.location.host}/ws/files/{{ device.hostname }}/`);
+
+            filesSocket.onmessage = function (event) {
+                const data = JSON.parse(event.data);
+                if (data.type === "new_file") {
+                    const fileData = data.data;
+
+                    // Seleccionar la lista correspondiente según el tipo de encriptación
+                    let fileListId;
+                    if (fileData.encryption === "encrypted") {
+                        fileListId = "encrypted-files";
+                    } else if (fileData.encryption === "zip") {
+                        fileListId = "zip-files";
+                    } else if (fileData.encryption === "decrypted") {
+                        fileListId = "decrypted-files";
+                    }
+
+                    // Añadir el archivo a la lista correspondiente
+                    if (fileListId) {
+                        const fileList = document.getElementById(fileListId);
+                        const listItem = document.createElement("li");
+
+                        // Crear el enlace de descarga
+                        const downloadLink = document.createElement("a");
+                        downloadLink.href = `/media/${fileData.name}`; // Ajusta la ruta según tu configuración de Django
+                        downloadLink.textContent = "Download";
+                        downloadLink.classList.add("btn", "btn-sm", "btn-primary", "ms-2");
+                        downloadLink.setAttribute("download", fileData.name);
+
+                        // Añadir el nombre del archivo y el botón de descarga al elemento de la lista
+                        listItem.textContent = fileData.name;
+                        listItem.appendChild(downloadLink);
+                        fileList.appendChild(listItem);
+                    }
+                }
+            };
+
+            filesSocket.onclose = function () {
+                console.error("WebSocket connection closed.");
+            };
         });
     </script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const decryptZipModal = new bootstrap.Modal(document.getElementById("decryptZipModal"));
+            const decryptZipForm = document.getElementById("decryptZipForm");
+            const decryptError = document.getElementById("decryptError");
+
+            // Manejar clic en el botón "Decrypt"
+            document.querySelectorAll(".decrypt-zip-btn").forEach(button => {
+                button.addEventListener("click", function () {
+                    const fileId = this.getAttribute("data-file-id");
+                    document.getElementById("fileId").value = fileId;
+                    decryptError.style.display = "none";
+                    decryptZipModal.show();
+                });
+            });
+
+            // Manejar el envío del formulario de desencriptación
+            decryptZipForm.addEventListener("submit", function (e) {
+                e.preventDefault();
+
+                const formData = new FormData(decryptZipForm);
+
+                fetch("{% url 'monitorize:decrypt_zip' %}", {
+                    method: "POST",
+                    body: formData,
+                    headers: { "X-CSRFToken": "{{ csrf_token }}" }
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.error) {
+                            decryptError.textContent = data.error;
+                            decryptError.style.display = "block";
+                        } else {
+                            decryptZipModal.hide();
+                            location.reload(); // Recargar la página para actualizar la lista de archivos
+                        }
+                    });
+            });
+        });
+    </script>
+    <script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const decryptEncryptedModal = new bootstrap.Modal(document.getElementById("decryptEncryptedModal"));
+        const decryptEncryptedForm = document.getElementById("decryptEncryptedForm");
+        const decryptEncryptedError = document.getElementById("decryptEncryptedError");
+
+        // Manejar clic en el botón "Decrypt"
+        document.querySelectorAll(".decrypt-encrypted-btn").forEach(button => {
+            button.addEventListener("click", function () {
+                const fileId = this.getAttribute("data-file-id");
+                document.getElementById("encryptedFileId").value = fileId;
+                decryptEncryptedError.style.display = "none";
+                decryptEncryptedModal.show();
+            });
+        });
+
+        // Manejar el envío del formulario de desencriptación
+        decryptEncryptedForm.addEventListener("submit", function (e) {
+            e.preventDefault();
+
+            const formData = new FormData(decryptEncryptedForm);
+
+            fetch("{% url 'monitorize:decrypt_encrypted_file' %}", {
+                method: "POST",
+                body: formData,
+                headers: { "X-CSRFToken": "{{ csrf_token }}" }
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        decryptEncryptedError.textContent = data.error;
+                        decryptEncryptedError.style.display = "block";
+                    } else {
+                        decryptEncryptedModal.hide();
+                        location.reload(); // Recargar la página para actualizar la lista de archivos
+                    }
+                });
+        });
+    });
+</script>
 </body>
 </html>
