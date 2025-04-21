@@ -4,6 +4,7 @@ import re
 import json
 from channels.generic.websocket import AsyncWebsocketConsumer
 from asgiref.sync import sync_to_async
+from .models import Device
 
 class SSHConsumer(AsyncWebsocketConsumer):
     async def connect(self):
@@ -12,8 +13,10 @@ class SSHConsumer(AsyncWebsocketConsumer):
         self.ssh_client = None
         self.channel = None
 
+        # Accept the WebSocket connection FIRST
+        await self.accept()
+
         # Obtener los detalles del dispositivo
-        from .models import Device
         self.device = await sync_to_async(Device.objects.get)(hostname=self.hostname)
 
         # Obtener credenciales de cookies
@@ -21,9 +24,8 @@ class SSHConsumer(AsyncWebsocketConsumer):
         username = session.get(f"{self.hostname}_username")
         password = session.get(f"{self.hostname}_password")
 
-
         if not username or not password:
-            await self.send("Error: Missing credentials.")
+            await self.send(text_data="Error: Missing credentials.")
             await self.close()
             return
 
@@ -44,7 +46,7 @@ class SSHConsumer(AsyncWebsocketConsumer):
             # Leer la salida inicial del shell
             asyncio.create_task(self.read_from_channel())
         except Exception as e:
-            await self.send(f"Error: {str(e)}")
+            await self.send(text_data=f"Error: {str(e)}")
             await self.close()
 
     async def disconnect(self, close_code):
@@ -62,7 +64,7 @@ class SSHConsumer(AsyncWebsocketConsumer):
         while True:
             if self.channel.recv_ready():
                 output = self.channel.recv(1024).decode('utf-8')
-                await self.send(output)  # Enviar la salida al cliente sin filtrar
+                await self.send(text_data=output)  # Use text_data parameter here
             await asyncio.sleep(0.1)
 
 

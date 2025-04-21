@@ -16,7 +16,7 @@ class UserAdmin(BaseUserAdmin):
     # Campos que se mostrarán al editar un usuario
     fieldsets = [
         (None, {"fields": ["username"]}),
-        ("Change Password", {"fields": ["new_password1", "new_password2"]}),
+        ("Change Password", {"fields": ["newpassword1", "newpassword2"]}),
     ]
     
     # Campos que se mostrarán al crear un usuario

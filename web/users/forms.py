@@ -4,11 +4,11 @@ from django.contrib.auth import authenticate
 from .models import OurUser
 
 class UserChangeForm(forms.ModelForm):
-    new_password1 = forms.CharField(label="New Password", widget=forms.PasswordInput, required=False)
-    new_password2 = forms.CharField(label="Confirm New Password", widget=forms.PasswordInput, required=False)
+    newpassword1 = forms.CharField(label="New Password", widget=forms.PasswordInput, required=False)
+    newpassword2 = forms.CharField(label="Confirm New Password", widget=forms.PasswordInput, required=False)
     class Meta:
         model = OurUser
-        fields = ("username", "new_password1", "new_password2")
+        fields = ("username", "newpassword1", "newpassword2")
 
     def clean_username(self):
         cleaned_data = super().clean()
@@ -18,16 +18,19 @@ class UserChangeForm(forms.ModelForm):
             raise ValidationError("Username already exists.")
         return username
     
-    def clean_new_password1(self):
-        new_password1 = self.cleaned_data.get("new_password1")
-        new_password2 = self.cleaned_data.get("new_password2")
+    def clean_newpassword2(self):
+        cleaned_data = super().clean()
+        new_password1 = cleaned_data.get("newpassword1")
+        new_password2 = cleaned_data.get("newpassword2")
+        
+        # Si uno de los campos está vacío pero no ambos
         if new_password1 and new_password2 and new_password1 != new_password2:
-            raise ValidationError("The new passwords do not match.")
-        return new_password1
+            raise ValidationError("Passwords do not match.")
+        return new_password2
     
     def save(self, commit=True):
         user = super().save(commit=False)
-        new_password1 = self.cleaned_data.get("new_password1")
+        new_password1 = self.cleaned_data.get("newpassword1")
         if new_password1:
             user.set_password(new_password1)
         if commit:

@@ -10,13 +10,15 @@ class DeviceChangeForm(forms.ModelForm):
 
     def clean_hostname(self):
         hostname = self.cleaned_data.get("hostname")
-        if Device.objects.filter(hostname=hostname).exists():
+        device_id = self.instance.id
+        if Device.objects.filter(hostname=hostname).exclude(id=device_id).exists():
             raise ValidationError("A device with this hostname already exists.")
         return hostname
     
     def clean_ip(self):
         ip = self.cleaned_data.get("ip")
-        if Device.objects.filter(ip=ip).exists():
+        device_id = self.instance.id
+        if Device.objects.filter(ip=ip).exclude(id=device_id).exists():
             raise ValidationError("A device with this IP address already exists.")
         return ip
 
@@ -68,13 +70,15 @@ class PrivateKeyChangeForm(forms.ModelForm):
 
     def clean_name(self):
         name = self.cleaned_data.get("name")
-        if PrivateKey.objects.filter(name=name).exists():
+        private_id = self.instance.id
+        if PrivateKey.objects.filter(name=name).exclude(id=private_id).exists():
             raise ValidationError("A private key with this name already exists.")
         return name
         
     def clean_key(self):
         key = self.cleaned_data.get("key")
-        if PrivateKey.objects.filter(key=key).exists():
+        private_id = self.instance.id
+        if PrivateKey.objects.filter(key__icontains=key.name).exclude(id=private_id).exists():
             raise ValidationError("A private key with this file already exists.")
         return key
 
@@ -109,8 +113,9 @@ class PrivateKeyCreationForm(forms.ModelForm):
         
     def clean_key(self):
         key = self.cleaned_data.get("key")
-        if PrivateKey.objects.filter(key=key).exists():
-            raise ValidationError("A private key with this file already exists.")
+        if key:
+            if PrivateKey.objects.filter(key__icontains=key.name).exists():
+                raise ValidationError("A private key with this file already exists.")
         return key
 
     def save(self, commit=True):

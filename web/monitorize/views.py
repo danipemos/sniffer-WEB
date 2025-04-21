@@ -1,8 +1,8 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
-from .forms import DeviceCreationForm, PrivateKeyCreationForm
+from .forms import DeviceCreationForm, PrivateKeyCreationForm, PrivateKeyChangeForm, DeviceChangeForm
 from .models import Device,File,PrivateKey
-from users.forms import UserCreationForm
+from users.forms import UserCreationForm, UserChangeForm
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 import paramiko
@@ -17,18 +17,14 @@ from Crypto.PublicKey import RSA
 import os
 import zipfile
 import re
+from django.contrib.auth import get_user_model
 
+
+User = get_user_model()
 
 @login_required
 def home(request):
-    user_form = UserCreationForm()
-    private_key_form = PrivateKeyCreationForm()
-    device_form = DeviceCreationForm()
-    return render(request, "home.html", {
-        "user_form": user_form,
-        "private_key_form": private_key_form,
-        "device_form": device_form,
-    })
+    return render(request, "home.html")
 
 @login_required
 def add_user(request):
@@ -36,18 +32,10 @@ def add_user(request):
         form = UserCreationForm(request.POST)
         if form.is_valid():
             form.save()
-            return redirect("monitorize:home")
+            return JsonResponse({"message": "User added successfully."})
         else:
-            private_key_form = PrivateKeyCreationForm()
-            device_form = DeviceCreationForm()
-            return render(request, "home.html", {
-                "user_form": form,
-                "private_key_form": private_key_form,
-                "device_form": device_form,
-                "open_modal": "userModal",  # Indica que el modal de usuario debe estar abierto
-            })
-    else:
-        return redirect("monitorize:home")
+            return JsonResponse({"errors": form.errors}, status=400)
+    return redirect("monitorize:users")
 
 @login_required
 def add_private_key(request):
@@ -55,18 +43,10 @@ def add_private_key(request):
         form = PrivateKeyCreationForm(request.POST, request.FILES)
         if form.is_valid():
             form.save()
-            return redirect("monitorize:home")
+            return JsonResponse({"message": "Private key added successfully."})
         else:
-            user_form = UserCreationForm()
-            device_form = DeviceCreationForm()
-            return render(request, "home.html", {
-                "user_form": user_form,
-                "private_key_form": form,
-                "device_form": device_form,
-                "open_modal": "privateKeyModal",  # Indica que el modal de clave privada debe estar abierto
-            })
-    else:
-        return redirect("monitorize:home")
+            return JsonResponse({"errors": form.errors}, status=400)
+    return redirect("monitorize:private_keys")
 
 @login_required
 def add_device(request):
@@ -74,34 +54,12 @@ def add_device(request):
         form = DeviceCreationForm(request.POST)
         if form.is_valid():
             form.save()
-            return redirect("monitorize:home")
+            return JsonResponse({"message": "Device added successfully."})
         else:
-            user_form = UserCreationForm()
-            private_key_form = PrivateKeyCreationForm()
-            return render(request, "home.html", {
-                "user_form": user_form,
-                "private_key_form": private_key_form,
-                "device_form": form,
-                "open_modal": "deviceModal",  # Indica que el modal de dispositivo debe estar abierto
-            })
+            return JsonResponse({"errors": form.errors}, status=400)
     else:
-        return redirect("monitorize:home")
+        return redirect("monitorize:devices")
     
-@login_required
-def ssh_terminal_view(request, hostname):
-    device = get_object_or_404(Device, hostname=hostname)
-
-    # Verificar si las credenciales existen en la sesión
-    username = request.session.get(f"{hostname}_username")
-    password = request.session.get(f"{hostname}_password")
-
-    if not username or not password:
-        # Si no existen, devolver una respuesta para solicitar credenciales
-        return JsonResponse({"error": "missing_credentials"}, status=400)
-
-    return render(request, "ssh_terminal.html", {"device": device, "username": username, "password": password})
-
-
 @login_required
 def set_credentials(request, hostname):
     if request.method == "POST":
@@ -146,7 +104,7 @@ def edit_file(request, hostname):
         return JsonResponse({"error": "Missing credentials"}, status=400)
 
     # Ruta fija del archivo
-    file_path = "/home/dani/eloy"
+    file_path = "/home/dani/sniffer/config.ini"
 
     if request.method == "GET":
         try:
@@ -193,7 +151,7 @@ def edit_file(request, hostname):
 
 @login_required
 def device_list(request):
-    devices = Device.objects.all()
+    devices = Device.objects.all().order_by("id")
     return render(request, "device_list.html", {"devices": devices})
 
 @login_required
@@ -318,15 +276,24 @@ def receive_device_stats(request, hostname):
         try:
             # Parsear los datos enviados desde el dispositivo
             stats = json.loads(request.body.decode("utf-8"))
-            packets_per_protocol = stats.get("packets_per_protocol", [])
-            total_time = stats.get("total_time", 0)
+            elapsed_time = stats.get("elapsed_time", 0)
+            total_packets = stats.get("total_packets", {})
             total_megabytes = stats.get("total_megabytes", 0)
-            average_bandwidth = stats.get("average_bandwidth", 0)
+            bandwidth_mbps = stats.get("bandwidth_mbps", 0)
             sessions = stats.get("sessions", [])
+            processing_packets = stats.get("processing_packets", None)  # Campo opcional
 
-            # Convertir listas a cadenas separadas por saltos de línea
-            packets_per_protocol_str = "\n".join(packets_per_protocol)
-            sessions_str = "\n".join(sessions)
+            # Convertir el diccionario de paquetes por protocolo a una cadena legible
+            packets_per_protocol_str = "\n".join(
+                f"{protocol}: {count}" for protocol, count in total_packets.items()
+            )
+
+            # Convertir las sesiones a una cadena legible
+            sessions_str = "\n".join(
+                f"{session['protocol']} {session['src_ip']}:{session['src_port']} -> {session['dst_ip']}:{session['dst_port']} "
+                f"Packets: {session['packet_count']} Size: {session['total_size_kb']} KB"
+                for session in sessions
+            )
 
             # Enviar estadísticas al grupo WebSocket correspondiente
             channel_layer = get_channel_layer()
@@ -336,10 +303,11 @@ def receive_device_stats(request, hostname):
                     "type": "send_stats",
                     "data": {
                         "packets_per_protocol": packets_per_protocol_str,
-                        "total_time": total_time,
+                        "total_time": elapsed_time,
                         "total_megabytes": total_megabytes,
-                        "average_bandwidth": average_bandwidth,
+                        "average_bandwidth": bandwidth_mbps,
                         "sessions": sessions_str,
+                        "processing_packets": processing_packets,  # Incluir el campo opcional
                     },
                 }
             )
@@ -470,3 +438,81 @@ def decrypt_encrypted_file(request):
             return JsonResponse({"error": f"An error occurred: {str(e)}"}, status=500)
 
     return JsonResponse({"error": "Invalid request method."}, status=405)
+
+@login_required
+def users(request):
+    users = User.objects.all().order_by("id") 
+    return render(request, "users.html", {"users": users})
+
+@login_required
+def private_keys(request):
+    private_keys = PrivateKey.objects.all().order_by("id")
+    for key in private_keys:
+        key.basename = os.path.basename(key.key.name) 
+    return render(request, "private_keys.html", {"private_keys": private_keys})
+
+
+@login_required
+def delete_private_key(request, key_id):
+    if request.method == "POST":
+        private_key = get_object_or_404(PrivateKey, id=key_id)
+        private_key.delete()
+    return redirect("monitorize:private_keys")
+
+@login_required
+def edit_private_key(request,key_id):
+    if request.method == "POST":
+        private_key = get_object_or_404(PrivateKey, id=key_id)
+        form = PrivateKeyChangeForm(request.POST, request.FILES, instance=private_key)
+        if form.is_valid():
+            form.save()
+            return JsonResponse({"message": "Private key updated successfully."})
+        else:
+            return JsonResponse({"errors": form.errors}, status=400)
+    return redirect("monitorize:private_keys")
+
+
+@login_required
+def delete_user(request, user_id):
+    if request.method == "POST":
+        user = get_object_or_404(User, id=user_id)
+        user.delete()
+    return redirect("monitorize:users")
+
+@login_required
+def edit_user(request,user_id):
+    if request.method == "POST":
+        user = get_object_or_404(User, id=user_id)
+        form = UserChangeForm(request.POST, instance=user)
+        if form.is_valid():
+            form.save()
+            return JsonResponse({"message": "User updated successfully."})
+        else:
+            return JsonResponse({"errors": form.errors}, status=400)
+    return redirect("monitorize:users")
+
+@login_required
+def delete_device(request, device_id):
+    if request.method == "POST":
+        device = get_object_or_404(Device, id=device_id)
+        device.delete()
+    return redirect("monitorize:devices")
+
+@login_required
+def edit_device(request, device_id):
+    if request.method == "POST":
+        device = get_object_or_404(Device, id=device_id)
+        form = DeviceChangeForm(request.POST, instance=device)
+        if form.is_valid():
+            form.save()
+            return JsonResponse({"message": "Device updated successfully."})
+        else:
+            return JsonResponse({"errors": form.errors}, status=400)
+    return redirect("monitorize:devices")
+
+@login_required
+def delete_file(request, file_id):
+    if request.method == "POST":
+        file_instance = get_object_or_404(File, id=file_id)
+        file_instance.delete()
+    return redirect("monitorize:device_detail", hostname=file_instance.device.hostname)

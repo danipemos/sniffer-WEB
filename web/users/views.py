@@ -9,10 +9,10 @@ def login_user(request):
         form = LoginForm(request.POST)
         if form.is_valid():
             login(request, form.user)
-            return redirect("admin:index")
+            return redirect("monitorize:home")
     else:
         if request.user.is_authenticated:
-            return redirect("admin:index")
+            return redirect("monitorize:home")
         form = LoginForm()
     return render(request, "login.html", {"form": form})
 

@@ -2,6 +2,8 @@ from django.db import models
 import os
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
+from django.db.models.signals import post_delete
+from django.dispatch import receiver
 
 class Device(models.Model):
     hostname = models.CharField(max_length=255)
@@ -17,7 +19,7 @@ class PrivateKey(models.Model):
 
     def __str__(self):
         return self.name
-
+    
 def file_upload_path(instance, filename):
     hostname = instance.device.hostname
 
@@ -32,6 +34,7 @@ def file_upload_path(instance, filename):
         instance.encryption = "decrypted"
 
     return os.path.join(folder, filename)
+
 
 class File(models.Model):
     name = models.CharField(max_length=255)
@@ -51,8 +54,19 @@ class File(models.Model):
             {
                 "type": "new_file",
                 "data": {
+                    "id": self.id,  # Add this line to include the file ID
                     "name": self.name,
                     "encryption": self.encryption,
                 },
             }
         )
+
+@receiver(post_delete, sender=File)
+def delete_file_on_instance_delete(sender, instance, **kwargs):
+    if instance.file and os.path.isfile(instance.file.path):
+        os.remove(instance.file.path)
+
+@receiver(post_delete, sender=PrivateKey)
+def delete_private_key_on_instance_delete(sender, instance, **kwargs):
+    if instance.key and os.path.isfile(instance.key.path):
+        os.remove(instance.key.path)
