@@ -8,3 +8,4 @@ paramiko
 whitenoise
 pyzipper
 pycryptodome
+daphne

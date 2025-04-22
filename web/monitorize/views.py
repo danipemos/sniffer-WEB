@@ -1,6 +1,6 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
-from .forms import DeviceCreationForm, PrivateKeyCreationForm, PrivateKeyChangeForm, DeviceChangeForm
+from .forms import DeviceCreationForm, PrivateKeyCreationForm, PrivateKeyChangeForm, DeviceChangeForm, FileCreationForm
 from .models import Device,File,PrivateKey
 from users.forms import UserCreationForm, UserChangeForm
 from django.http import JsonResponse
