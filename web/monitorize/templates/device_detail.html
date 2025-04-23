@@ -19,16 +19,6 @@
             height: 200px;
             font-size: 16px;
         }
-        .btn-custom i {
-            font-size: 48px;
-        }
-        .modal-header {
-            background-color: #007bff;
-            color: white;
-        }
-        .modal-title {
-            font-weight: bold;
-        }
         .btn-custom-square {
             width: 150px;
             height: 150px;
@@ -40,6 +30,9 @@
         }
         .btn-custom-square i {
             font-size: 36px;
+        }
+        body {
+        margin-bottom: 50px; /* Ajusta el valor según el espacio que necesites */
         }
     </style>
 </head>
@@ -106,13 +99,43 @@
         <!-- Real-Time Statistics -->
         <div class="mt-4">
             <h3 class="text-center">Real-Time Statistics</h3>
-            <ul class="list-group">
-                <li class="list-group-item"><strong>Packets per Protocol:</strong> <pre id="packets_per_protocol">-</pre></li>
-                <li class="list-group-item"><strong>Total Time:</strong> <span id="total_time">-</span> seconds</li>
-                <li class="list-group-item"><strong>Total MegaBytes:</strong> <span id="total_megabytes">-</span> MB</li>
-                <li class="list-group-item"><strong>Average Bandwidth:</strong> <span id="average_bandwidth">-</span> Mbps</li>
-                <li class="list-group-item"><strong>Sessions:</strong> <pre id="sessions">-</pre></li>
-            </ul>
+            <div class="accordion" id="statsAccordion">
+                <!-- Packets per Protocol -->
+                <div class="accordion-item">
+                    <h2 class="accordion-header" id="headingPackets">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapsePackets" aria-expanded="false" aria-controls="collapsePackets">
+                            <strong>Packets per Protocol</strong>
+                        </button>
+                    </h2>
+                    <div id="collapsePackets" class="accordion-collapse collapse" aria-labelledby="headingPackets">
+                        <div class="accordion-body">
+                            <ul class="list-group">
+                                <li class="list-group-item"><span id="packets_per_protocol">-</span></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <ul class="list-group">
+                    <li class="list-group-item"><strong>Total Time:</strong> <span id="total_time">-</span> seconds</li>
+                    <li class="list-group-item"><strong>Total MegaBytes:</strong> <span id="total_megabytes">-</span> MB</li>
+                    <li class="list-group-item"><strong>Average Bandwidth:</strong> <span id="average_bandwidth">-</span> Mbps</li>
+                </ul>
+                <!-- Sessions -->
+                <div class="accordion-item">
+                    <h2 class="accordion-header" id="headingSessions">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseSessions" aria-expanded="false" aria-controls="collapseSessions">
+                            <strong>Sessions</strong>
+                        </button>
+                    </h2>
+                    <div id="collapseSessions" class="accordion-collapse collapse" aria-labelledby="headingSessions">
+                        <div class="accordion-body" style="overflow-y:auto;">
+                            <ul class="list-group">
+                                <li class="list-group-item"><span id="sessions">-</span></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Uploaded Files -->
@@ -122,10 +145,10 @@
                 <div class="accordion-item">
                     <h2 class="accordion-header" id="headingEncrypted">
                         <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseEncrypted" aria-expanded="true" aria-controls="collapseEncrypted">
-                            Encrypted Files
+                            <strong>GPG Files</strong>
                         </button>
                     </h2>
-                    <div id="collapseEncrypted" class="accordion-collapse collapse" aria-labelledby="headingEncrypted" data-bs-parent="#fileAccordion">
+                    <div id="collapseEncrypted" class="accordion-collapse collapse" aria-labelledby="headingEncrypted">
                         <div class="accordion-body">
                             <ul class="list-group">
                                 {% for file in encrypted_files %}
@@ -145,10 +168,10 @@
                 <div class="accordion-item">
                     <h2 class="accordion-header" id="headingZip">
                         <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseZip" aria-expanded="false" aria-controls="collapseZip">
-                            ZIP Files
+                            <strong>ZIP Files</strong> 
                         </button>
                     </h2>
-                    <div id="collapseZip" class="accordion-collapse collapse" aria-labelledby="headingZip" data-bs-parent="#fileAccordion">
+                    <div id="collapseZip" class="accordion-collapse collapse" aria-labelledby="headingZip">
                         <div class="accordion-body">
                             <ul class="list-group">
                                 {% for file in zip_files %}
@@ -168,10 +191,10 @@
                 <div class="accordion-item">
                     <h2 class="accordion-header" id="headingDecrypted">
                         <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseDecrypted" aria-expanded="false" aria-controls="collapseDecrypted">
-                            Decrypted Files
+                            <strong>Decrypted Files</strong> 
                         </button>
                     </h2>
-                    <div id="collapseDecrypted" class="accordion-collapse collapse" aria-labelledby="headingDecrypted" data-bs-parent="#fileAccordion">
+                    <div id="collapseDecrypted" class="accordion-collapse collapse" aria-labelledby="headingDecrypted">
                         <div class="accordion-body">
                             <ul class="list-group">
                                 {% for file in decrypted_files %}
@@ -188,13 +211,6 @@
                     </div>
                 </div>
             </div>
-        </div>
-
-        <div class="text-center mt-4">
-            <a href="{% url 'monitorize:devices' %}" class="btn btn-primary btn-custom">
-                <i class="bi bi-arrow-left"></i>
-                <span class="d-block mt-2">Back to Devices</span>
-            </a>
         </div>
     </div>
 
@@ -340,6 +356,13 @@
             data-bs-toggle="modal" data-bs-target="#addFileModal">
         <i class="bi bi-upload"></i>
     </button>
+
+    <a href="{% url 'monitorize:devices' %}" 
+       class="btn btn-primary position-fixed d-flex align-items-center" 
+       style="top: 60px; left: 20px; height: 40px; font-size: 14px; padding: 0 15px;">
+        <i class="bi bi-arrow-left me-2"></i>
+        <span>Back to Devices</span>
+    </a>
 
     <!-- Modal para subir un fichero -->
     <div class="modal fade" id="addFileModal" tabindex="-1" aria-labelledby="addFileModalLabel" aria-hidden="true">
@@ -614,15 +637,22 @@
                         listItem.classList.add("list-group-item", "d-flex", "justify-content-between", "align-items-center");
 
                         // PRIMERO: Establecer el texto del nombre del archivo
-                        listItem.textContent = fileData.name;
+                        const fileNameSpan = document.createElement("span");
+                        fileNameSpan.textContent = fileData.name;
+                        listItem.appendChild(fileNameSpan);
 
-                        // SEGUNDO: Crear y añadir el enlace de descarga
+                        // Crear un contenedor para los botones
+                        const buttonContainer = document.createElement("div");
+                        buttonContainer.style.display = "inline-flex"; // Asegurar que los botones estén alineados horizontalmente
+                        buttonContainer.style.gap = "0.5rem"; // Garantizar espacio consistente entre botones
+                        
+                        // SEGUNDO: Crear y añadir el enlace de descarga al contenedor
                         const downloadLink = document.createElement("a");
                         downloadLink.href = `/media/${fileData.name}`;
                         downloadLink.textContent = "Download";
                         downloadLink.classList.add("btn", "btn-sm", "btn-primary", "me-2");
                         downloadLink.setAttribute("download", fileData.name);
-                        listItem.appendChild(downloadLink);
+                        buttonContainer.appendChild(downloadLink);
 
                         // TERCERO: Añadir el botón de desencriptar si corresponde
                         if (fileData.encryption === "encrypted" || fileData.encryption === "zip") {
@@ -651,24 +681,27 @@
                                 });
                             }
 
-                            // Añadir el botón al elemento de la lista
-                            listItem.appendChild(decryptButton);
+                            // Añadir el botón al contenedor
+                            buttonContainer.appendChild(decryptButton);
                         }
 
-                        // CUARTO: Añadir el botón de eliminar
+                        // CUARTO: Añadir el botón de eliminar al contenedor
                         const deleteButton = document.createElement("button");
                         deleteButton.textContent = "Delete";
                         deleteButton.classList.add("btn", "btn-sm", "btn-danger", "delete-file-btn");
                         deleteButton.setAttribute("data-file-id", fileData.id);
                         deleteButton.addEventListener("click", function () {
-                            const fileName = this.closest('li').childNodes[0].textContent.trim(); // Obtener el nombre del archivo
-                            document.getElementById('deleteFileName').textContent = fileName; // Mostrar el nombre en el modal
+                            const fileName = this.closest('li').childNodes[0].textContent.trim();
+                            document.getElementById('deleteFileName').textContent = fileName;
                             const deleteForm = document.getElementById('deleteFileForm');
-                            deleteForm.action = `/monitorize/device/delete_file/${fileData.id}/`; // Configurar la acción del formulario
+                            deleteForm.action = `/monitorize/device/delete_file/${fileData.id}/`;
                             const deleteModal = new bootstrap.Modal(document.getElementById('deleteFileModal'));
-                            deleteModal.show(); // Mostrar el modal
+                            deleteModal.show();
                         });
-                        listItem.appendChild(deleteButton);
+                        buttonContainer.appendChild(deleteButton);
+
+                        // Añadir el contenedor de botones al elemento de la lista
+                        listItem.appendChild(buttonContainer);
 
                         // Añadir el nuevo elemento a la lista
                         fileList.appendChild(listItem);

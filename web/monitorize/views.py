@@ -290,7 +290,7 @@ def receive_device_stats(request, hostname):
 
             # Convertir las sesiones a una cadena legible
             sessions_str = "\n".join(
-                f"{session['protocol']} {session['src_ip']}:{session['src_port']} -> {session['dst_ip']}:{session['dst_port']} "
+                f"{session['protocol']} {session['src_ip']}{session['src_port']} -> {session['dst_ip']}{session['dst_port']} "
                 f"Packets: {session['packet_count']} Size: {session['total_size_kb']} KB"
                 for session in sessions
             )
