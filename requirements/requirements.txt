@@ -9,3 +9,4 @@ whitenoise
 pyzipper
 pycryptodome
 daphne
+python-gnupg
