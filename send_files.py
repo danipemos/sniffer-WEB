@@ -1,9 +1,9 @@
 import gnupg
-
+from django.conf import settings
 # Inicializa el objeto GPG
-gpg = gnupg.GPG()
+gpg = gnupg.GPG(gnupghome=settings.GNUPG_HOME)
 
-gpg.gen_key_input()
+#gpg.gen_key_input()
 
 # Listar claves públicas
 public_keys = gpg.list_keys()
