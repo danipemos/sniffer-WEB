@@ -1,7 +1,10 @@
 from django import forms
-from .models import Device, PrivateKey, File
+from .models import Device, File
 from django.core.exceptions import ValidationError
-import os
+import gnupg
+from django.conf import settings
+# Inicializa el objeto GPG
+gpg = gnupg.GPG(gnupghome=settings.GNUPG_HOME)
 
 class DeviceChangeForm(forms.ModelForm):
     class Meta:
@@ -63,68 +66,66 @@ class DeviceCreationForm(forms.ModelForm):
             device.save()
         return device
     
-class PrivateKeyChangeForm(forms.ModelForm):
-    class Meta:
-        model = PrivateKey
-        fields = ("name", "key")
-
-    def clean_name(self):
-        name = self.cleaned_data.get("name")
-        private_id = self.instance.id
-        if PrivateKey.objects.filter(name=name).exclude(id=private_id).exists():
-            raise ValidationError("A private key with this name already exists.")
-        return name
-        
-    def clean_key(self):
-        key = self.cleaned_data.get("key")
-        private_id = self.instance.id
-        if PrivateKey.objects.filter(key__icontains=key.name).exclude(id=private_id).exists():
-            raise ValidationError("A private key with this file already exists.")
-        return key
-
-    def save(self, commit=True):
-        private_key = super().save(commit=False)
-        if private_key.pk: 
-            old_private_key = PrivateKey.objects.get(pk=private_key.pk)
-            if old_private_key.key and old_private_key.key != self.cleaned_data["key"]:
-                if os.path.isfile(old_private_key.key.path):
-                    os.remove(old_private_key.key.path)
-        private_key.name = self.cleaned_data["name"]
-        private_key.key = self.cleaned_data["key"]
-        if commit:
-            private_key.save()
-        return private_key
     
-class PrivateKeyCreationForm(forms.ModelForm):
+class PrivateKeyCreationForm(forms.Form):
     name = forms.CharField(label="Name", max_length=255, required=True)
-    key = forms.FileField(label="Private Key File", required=True)
-    name.widget.attrs.update({"placeholder": "Name"})
-    key.widget.attrs.update({"placeholder": "Private Key File"})
-    
-    class Meta:
-        model = PrivateKey
-        fields = ("name", "key")
+    email = forms.EmailField(label="Email", max_length=255, required=True)
+    algorithm = forms.ChoiceField(
+        choices=[
+            ('RSA', 'RSA'),
+            ('DSA', 'DSA'),
+        ],
+        required=True
+    )
+    size = forms.IntegerField(label="Size", required=True)
+    comment = forms.CharField(label="Comment", widget=forms.Textarea, required=False)
+    passphrase = forms.CharField(label="Passphrase", widget=forms.PasswordInput, required=True)
+    expiration_date = forms.CharField(label="Expiration Date", required=True, help_text="Format: 1y, 6m, 2w, etc. 0 for no expiration")
 
-    def clean_name(self):
-        name = self.cleaned_data.get("name")
-        if PrivateKey.objects.filter(name=name).exists():
-            raise ValidationError("A private key with this name already exists.")
-        return name
+    def clean(self):
+        cleaned_data = super().clean()
         
-    def clean_key(self):
-        key = self.cleaned_data.get("key")
-        if key:
-            if PrivateKey.objects.filter(key__icontains=key.name).exists():
-                raise ValidationError("A private key with this file already exists.")
-        return key
+        # Verificar longitud de clave válida según algoritmo
+        algorithm = cleaned_data.get('algorithm')
+        key_size = cleaned_data.get('size')
+        
+        if algorithm == 'RSA' and (key_size < 1024 or key_size > 4096):
+            raise ValidationError({"size": "El tamaño de clave RSA debe estar entre 1024 y 4096 bits"})
+        
+        if algorithm == 'DSA' and (key_size < 1024 or key_size > 3072):
+            raise ValidationError({"size": "El tamaño de clave DSA debe ser 1024 bits"})
+        
+        # Verificar formato de fecha de expiración
+        expiration = cleaned_data.get('expiration_date')
+        if expiration != '0':
+            if not any(expiration.endswith(unit) for unit in ['d', 'w', 'm', 'y']):
+                raise ValidationError({"expiration_date": "Formato inválido. Use: 1y, 6m, 2w, 5d o 0"})
+            
+            try:
+                value = int(expiration[:-1])
+                if value <= 0:
+                    raise ValidationError({"expiration_date": "El valor debe ser positivo"})
+            except ValueError:
+                raise ValidationError({"expiration_date": "Formato inválido. Use: 1y, 6m, 2w, 5d o 0"})
+        
+        return cleaned_data
 
     def save(self, commit=True):
-        private_key = super().save(commit=False)
-        private_key.name = self.cleaned_data["name"]
-        private_key.key = self.cleaned_data["key"]
-        if commit:
-            private_key.save()
-        return private_key
+        input_data = {
+            'name_real': self.cleaned_data['name'],
+            'name_email': self.cleaned_data['email'],
+            'key_type': self.cleaned_data['algorithm'],
+            'key_length': self.cleaned_data['size'],
+            'passphrase': self.cleaned_data['passphrase'],
+            'expire_date': self.cleaned_data['expiration_date'],
+        }
+        if self.cleaned_data['comment']:
+            input_data['name_comment'] = self.cleaned_data['comment']
+        key = gpg.gen_key(gpg.gen_key_input(**input_data))
+        if not key.fingerprint:
+            raise ValidationError("Failed to generate key"+key.stderr)
+        else:
+            return key.fingerprint
 
 class FileCreationForm(forms.ModelForm):
     file = forms.FileField(label="file", required=True)

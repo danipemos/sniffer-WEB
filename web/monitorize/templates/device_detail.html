@@ -326,12 +326,8 @@
                     <form id="decryptEncryptedForm">
                         <input type="hidden" id="encryptedFileId" name="fileId">
                         <div class="mb-3">
-                            <label for="privateKeyId" class="form-label">Select Private Key</label>
-                            <select class="form-select" id="privateKeyId" name="privateKeyId" required>
-                                {% for key in private_keys %}
-                                <option value="{{ key.id }}">{{ key.name }}</option>
-                                {% endfor %}
-                            </select>
+                            <label for="passphrase" class="form-label">Passphrase</label>
+                            <input type="password" class="form-control" id="passphrase" name="passphrase" required>
                         </div>
                         <button type="submit" class="btn btn-primary">Decrypt</button>
                     </form>
@@ -370,6 +366,59 @@
             data-bs-toggle="modal" data-bs-target="#addFileModal">
         <i class="bi bi-upload"></i>
     </button>
+
+    <!-- Botón flotante para importar clave GPG -->
+    <button class="btn btn-success rounded-circle position-fixed" 
+            style="top: 60px; right: 90px; width: 60px; height: 60px; font-size: 24px;" 
+            data-bs-toggle="modal" data-bs-target="#gpgKeysModal">
+        <i class="bi bi-key"></i>
+    </button>
+
+    <!-- Modal para mostrar claves GPG -->
+    <div class="modal fade" id="gpgKeysModal" tabindex="-1" aria-labelledby="gpgKeysModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="gpgKeysModalLabel">GPG Keys</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="importStatusAlert" class="alert d-none" role="alert"></div>
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Email</th>
+                                    <th>Key ID</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for key in private_keys %}
+                                <tr>
+                                    <td>{{ key.real_name }}</td>
+                                    <td>{{ key.email }}</td>
+                                    <td>{{ key.keyid }}</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-primary import-key-btn" 
+                                                data-key-id="{{ key.fingerprint }}"
+                                                data-key-name="{{ key.real_name }}">
+                                            Import to Device
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <a href="{% url 'monitorize:devices' %}" 
        class="btn btn-primary position-fixed d-flex align-items-center" 
@@ -848,6 +897,48 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     });
 });
+</script>
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const gpgKeysModal = new bootstrap.Modal(document.getElementById("gpgKeysModal"));
+        const credentialsModal = new bootstrap.Modal(document.getElementById("credentialsModal"));
+        const importStatusAlert = document.getElementById("importStatusAlert");
+
+        // Manejar clic en el botón "Import to Device"
+        document.querySelectorAll(".import-key-btn").forEach(button => {
+            button.addEventListener("click", function () {
+                const keyId = this.getAttribute("data-key-id");
+                const keyName = this.getAttribute("data-key-name");
+
+                // Verificar si faltan credenciales
+                const missingCredentials = {{ missing_credentials|yesno:"true,false" }};
+                if (missingCredentials) {
+                    gpgKeysModal.hide();
+                    credentialsModal.show();
+                    return;
+                }
+
+                // Realizar la solicitud para importar la clave
+                fetch(`/monitorize/device/${encodeURIComponent('{{ device.hostname }}')}/import_key/${encodeURIComponent(keyId)}/`, {
+                    method: "POST",
+                    headers: {
+                        "X-CSRFToken": "{{ csrf_token }}"
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        // Mostrar error en el modal
+                        importStatusAlert.textContent = data.error;
+                        importStatusAlert.classList.remove("d-none", "alert-success");
+                        importStatusAlert.classList.add("alert-danger");
+                    } else {
+                        gpgKeysModal.hide();
+                    }
+                })
+            });
+        });
+    });
 </script>
 </body>
 </html>

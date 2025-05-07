@@ -15,32 +15,43 @@
         <table class="table table-striped mt-4">
             <thead>
                 <tr>
-                    <th>ID</th>
+                    <th>Keyid</th>
                     <th>Name</th>
-                    <th>File</th>
+                    <th>Email</th>
+                    <th>Algorithm</th>
+                    <th>Key Size</th>
+                    <th>Expiration Date</th>
                     <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
                 {% for private_key in private_keys %}
                 <tr>
-                    <td>{{ private_key.id }}</td>
-                    <td>{{ private_key.name }}</td>
-                    <td>{{ private_key.basename }}</td>
+                    <td>{{ private_key.keyid }}</td>
+                    <td>{{ private_key.real_name }}</td>
+                    <td>{{ private_key.email }}</td>
+                    <td>{{ private_key.algorithm }}</td>
+                    <td>{{ private_key.key_size }}</td>
+                    <td>{{ private_key.expiration_date }}</td>
                     <td>
-                        <!-- Edit Icon -->
-                        <button class="btn btn-sm btn-warning edit-key" data-id="{{ private_key.id }}" data-name="{{ private_key.name }}" data-file="{{ private_key.basename }}">
-                            <i class="bi bi-pencil"></i>
-                        </button>
+                        <a href="{% url 'monitorize:export_public_key' private_key.fingerprint %}" class="btn btn-sm btn-success">
+                            <i class="bi bi-download"></i> Export Public Key
+                        </a>
                         <!-- Delete Icon -->
-                        <button class="btn btn-sm btn-danger delete-key" data-id="{{ private_key.id }}" data-name="{{ private_key.name }}" data-file="{{ private_key.basename }}">
+                        <button class="btn btn-sm btn-danger delete-key" 
+                                data-id="{{ private_key.fingerprint }}" 
+                                data-name="{{ private_key.real_name }}" 
+                                data-email="{{ private_key.email }}" 
+                                data-algorithm="{{ private_key.algorithm }}" 
+                                data-size="{{ private_key.key_size }}" 
+                                data-expiration-date="{{ private_key.expiration_date }}">
                             <i class="bi bi-trash"></i>
                         </button>
                     </td>
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="4" class="text-center">No private keys found</td>
+                    <td colspan="7" class="text-center">No private keys found</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -63,17 +74,41 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <form id="addKeyForm" method="POST" enctype="multipart/form-data" action="{% url 'monitorize:add_private_key' %}">
+                    <form id="addKeyForm" method="POST" action="{% url 'monitorize:add_private_key' %}">
                         {% csrf_token %}
+                        <!-- Mensaje de error general -->
+                        <div class="alert alert-danger d-none" id="addKeyFormError"></div>
+
                         <div class="form-group">
                             <label for="addKeyName">Name</label>
                             <input type="text" class="form-control" id="addKeyName" name="name" placeholder="Enter key name" required>
-                            <div class="text-danger" id="addKeyNameError"></div>
                         </div>
                         <div class="form-group mt-3">
-                            <label for="addKeyFile">Private Key File</label>
-                            <input type="file" class="form-control" id="addKeyFile" name="key" required>
-                            <div class="text-danger" id="addKeyFileError"></div>
+                            <label for="addKeyEmail">Email</label>
+                            <input type="email" class="form-control" id="addKeyEmail" name="email" placeholder="Enter email" required>
+                        </div>
+                        <div class="form-group mt-3">
+                            <label for="addKeyAlgorithm">Algorithm</label>
+                            <select class="form-control" id="addKeyAlgorithm" name="algorithm" required>
+                                <option value="RSA">RSA</option>
+                                <option value="DSA">DSA</option>
+                            </select>
+                        </div>
+                        <div class="form-group mt-3">
+                            <label for="addKeySize">Key Size</label>
+                            <input type="number" class="form-control" id="addKeySize" name="size" placeholder="Enter key size (e.g., 2048)" required>
+                        </div>
+                        <div class="form-group mt-3">
+                            <label for="addKeyComment">Comment</label>
+                            <textarea class="form-control" id="addKeyComment" name="comment" placeholder="Enter comment (optional)"></textarea>
+                        </div>
+                        <div class="form-group mt-3">
+                            <label for="addKeyPassphrase">Passphrase</label>
+                            <input type="password" class="form-control" id="addKeyPassphrase" name="passphrase" placeholder="Enter passphrase" required>
+                        </div>
+                        <div class="form-group mt-3">
+                            <label for="addKeyExpiration">Expiration Date</label>
+                            <input type="text" class="form-control" id="addKeyExpiration" name="expiration_date" placeholder="e.g., 1y, 6m, 2w, 0" required>
                         </div>
                         <button type="submit" class="btn btn-primary mt-3">Add Key</button>
                     </form>
@@ -82,51 +117,28 @@
         </div>
     </div>
 
-    <!-- Modal for Editing -->
-    <div class="modal fade" id="editKeyModal" tabindex="-1" aria-labelledby="editKeyModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="editKeyModalLabel">Edit Private Key</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <form id="editKeyForm" method="POST" enctype="multipart/form-data">
-                        {% csrf_token %}
-                        <input type="hidden" id="editKeyId" name="key_id">
-                        <div class="form-group">
-                            <label for="editKeyName">Name</label>
-                            <input type="text" class="form-control" id="editKeyName" name="name" required>
-                            <div class="text-danger" id="editKeyNameError"></div>
-                        </div>
-                        <div class="form-group">
-                            <label for="currentKeyFile">Current Private Key File</label>
-                            <p id="currentKeyFile" class="form-control-plaintext"></p> <!-- Display current file -->
-                        </div>
-                        <div class="form-group">
-                            <label for="editKeyFile">Upload New Private Key File</label>
-                            <input type="file" class="form-control" id="editKeyFile" name="key">
-                            <div class="text-danger" id="editKeyFileError"></div>
-                        </div>
-                        <button type="submit" class="btn btn-primary">Save Changes</button>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <!-- Modal for Deleting -->
     <div class="modal fade" id="deleteKeyModal" tabindex="-1" aria-labelledby="deleteKeyModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered"> <!-- Clase modal-dialog-centered añadida -->
+        <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="deleteKeyModalLabel">Delete Private Key</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <p>Are you sure that you want to delete the private key?</p>
+                    <p>Are you sure that you want to delete the following private key?</p>
+                    <p><strong>Keyid:</strong> <span id="deleteKeyKeyid"></span></p>
                     <p><strong>Name:</strong> <span id="deleteKeyName"></span></p>
-                    <p><strong>File:</strong> <span id="deleteKeyFile"></span></p>
+                    <p><strong>Email:</strong> <span id="deleteKeyEmail"></span></p>
+                    <p><strong>Algorithm:</strong> <span id="deleteKeyAlgorithm"></span></p>
+                    <p><strong>Key Size:</strong> <span id="deleteKeySize"></span></p>
+                    <p><strong>Expiration Date:</strong> <span id="deleteKeyExpirationDate"></span></p>
+
+                    <!-- Passphrase Input -->
+                    <div class="form-group mt-3">
+                        <label for="deleteKeyPassphrase">Passphrase</label>
+                        <input type="password" class="form-control" id="deleteKeyPassphrase" name="passphrase" placeholder="Enter passphrase" required>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <form id="deleteKeyForm" method="POST" action="">
@@ -145,6 +157,11 @@
             e.preventDefault();
             const formData = new FormData(this);
 
+            // Limpiar errores previos
+            const errorDiv = document.getElementById('addKeyFormError');
+            errorDiv.classList.add('d-none');
+            errorDiv.textContent = '';
+
             fetch(this.action, {
                 method: "POST",
                 body: formData,
@@ -153,67 +170,67 @@
             .then(response => response.json())
             .then(data => {
                 if (data.errors) {
-                    // Display errors
-                    document.getElementById('addKeyNameError').textContent = data.errors.name || '';
-                    document.getElementById('addKeyFileError').textContent = data.errors.key || '';
+                    // Mostrar error general en el formulario
+                    errorDiv.textContent = Object.values(data.errors).join(' ');
+                    errorDiv.classList.remove('d-none');
                 } else {
-                    // Reload the page or update the table dynamically
-                    location.reload();
+                    location.reload(); // Recargar la página si se añade correctamente
                 }
+            })
+            .catch(error => {
+                errorDiv.textContent = 'An unexpected error occurred. Please try again.';
+                errorDiv.classList.remove('d-none');
             });
         });
 
-        // Handle Edit Modal
-        document.querySelectorAll('.edit-key').forEach(button => {
+        document.querySelectorAll('.delete-key').forEach(button => {
             button.addEventListener('click', function () {
                 const keyId = this.getAttribute('data-id');
                 const keyName = this.getAttribute('data-name');
-                const keyFile = this.getAttribute('data-file'); // Get the file name
-                document.getElementById('editKeyId').value = keyId;
-                document.getElementById('editKeyName').value = keyName;
-                document.getElementById('currentKeyFile').textContent = keyFile; // Display the current file
-                const editForm = document.getElementById('editKeyForm');
-                editForm.action = `{% url 'monitorize:edit_private_key' 0 %}`.replace("0", keyId); // Update form action with key_id
-                const editModal = new bootstrap.Modal(document.getElementById('editKeyModal'));
-                editModal.show();
+                const keyEmail = this.getAttribute('data-email');
+                const keyAlgorithm = this.getAttribute('data-algorithm');
+                const keySize = this.getAttribute('data-size');
+                const keyExpirationDate = this.getAttribute('data-expiration-date');
+
+                // Actualizar los campos del modal con los datos de la clave
+                document.getElementById('deleteKeyKeyid').textContent = keyId;
+                document.getElementById('deleteKeyName').textContent = keyName;
+                document.getElementById('deleteKeyEmail').textContent = keyEmail;
+                document.getElementById('deleteKeyAlgorithm').textContent = keyAlgorithm;
+                document.getElementById('deleteKeySize').textContent = keySize;
+                document.getElementById('deleteKeyExpirationDate').textContent = keyExpirationDate;
+
+                // Configurar la acción del formulario para eliminar la clave
+                const deleteForm = document.getElementById('deleteKeyForm');
+                deleteForm.action = `{% url 'monitorize:delete_private_key' 0 %}`.replace("0", keyId); // Aquí keyId ya es el fingerprint
+
+                // Mostrar el modal
+                const deleteModal = new bootstrap.Modal(document.getElementById('deleteKeyModal'));
+                deleteModal.show();
             });
         });
 
-        // Handle Edit Form Submission
-        document.getElementById('editKeyForm').addEventListener('submit', function (e) {
+        // Manejar el envío del formulario de eliminación
+        document.getElementById('deleteKeyForm').addEventListener('submit', function (e) {
             e.preventDefault();
             const formData = new FormData(this);
+            formData.append("passphrase", document.getElementById('deleteKeyPassphrase').value);
 
-            fetch(this.action, { // Use the updated form action
+            fetch(this.action, {
                 method: "POST",
                 body: formData,
                 headers: { "X-CSRFToken": "{{ csrf_token }}" }
             })
             .then(response => response.json())
             .then(data => {
-                if (data.errors) {
-                    // Display errors
-                    document.getElementById('editKeyNameError').textContent = data.errors.name || '';
-                    document.getElementById('editKeyFileError').textContent = data.errors.key || '';
+                if (data.error) {
+                    alert(data.error); // Mostrar error si ocurre
                 } else {
-                    // Reload the page or update the table dynamically
-                    location.reload();
+                    location.reload(); // Recargar la página si se elimina correctamente
                 }
-            });
-        });
-
-        // Handle Delete Modal
-        document.querySelectorAll('.delete-key').forEach(button => {
-            button.addEventListener('click', function () {
-                const keyId = this.getAttribute('data-id');
-                const keyName = this.getAttribute('data-name');
-                const keyFile = this.getAttribute('data-file');
-                document.getElementById('deleteKeyName').textContent = keyName;
-                document.getElementById('deleteKeyFile').textContent = keyFile;
-                const deleteForm = document.getElementById('deleteKeyForm');
-                deleteForm.action = `{% url 'monitorize:delete_private_key' 0 %}`.replace("0", keyId);
-                const deleteModal = new bootstrap.Modal(document.getElementById('deleteKeyModal'));
-                deleteModal.show();
+            })
+            .catch(error => {
+                alert('An unexpected error occurred. Please try again.');
             });
         });
     </script>

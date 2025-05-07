@@ -12,13 +12,6 @@ class Device(models.Model):
 
     def __str__(self):
         return self.hostname
-
-class PrivateKey(models.Model):
-    name = models.CharField(max_length=255)
-    key = models.FileField(upload_to='private_keys/')
-
-    def __str__(self):
-        return self.name
     
 def file_upload_path(instance, filename):
     hostname = instance.device.hostname
@@ -66,7 +59,3 @@ def delete_file_on_instance_delete(sender, instance, **kwargs):
     if instance.file and os.path.isfile(instance.file.path):
         os.remove(instance.file.path)
 
-@receiver(post_delete, sender=PrivateKey)
-def delete_private_key_on_instance_delete(sender, instance, **kwargs):
-    if instance.key and os.path.isfile(instance.key.path):
-        os.remove(instance.key.path)

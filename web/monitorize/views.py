@@ -1,7 +1,7 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
-from .forms import DeviceCreationForm, PrivateKeyCreationForm, PrivateKeyChangeForm, DeviceChangeForm, FileCreationForm
-from .models import Device,File,PrivateKey
+from .forms import DeviceCreationForm, PrivateKeyCreationForm, DeviceChangeForm
+from .models import Device,File
 from users.forms import UserCreationForm, UserChangeForm
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -18,6 +18,11 @@ import os
 import zipfile
 import re
 from django.contrib.auth import get_user_model
+import gnupg
+from django.conf import settings
+from datetime import datetime
+from django.http import HttpResponse
+gpg = gnupg.GPG(gnupghome=settings.GNUPG_HOME)
 
 
 User = get_user_model()
@@ -40,7 +45,7 @@ def add_user(request):
 @login_required
 def add_private_key(request):
     if request.method == "POST":
-        form = PrivateKeyCreationForm(request.POST, request.FILES)
+        form = PrivateKeyCreationForm(request.POST)
         if form.is_valid():
             form.save()
             return JsonResponse({"message": "Private key added successfully."})
@@ -169,8 +174,14 @@ def device_detail(request, hostname):
     encrypted_files = File.objects.filter(device=device, encryption="encrypted")
     zip_files = File.objects.filter(device=device, encryption="zip")
     decrypted_files = File.objects.filter(device=device, encryption="decrypted")
-    private_keys = PrivateKey.objects.all()  # Obtener todas las claves privadas
-
+    private_keys = []  # Obtener todas las claves privadas
+    for key in gpg.list_keys():       
+        private_keys.append({
+            'real_name': key['uids'][0].split('<')[0].strip(),
+            'keyid': key['keyid'],
+            'email': key['uids'][0].split('<')[1].strip('>'),
+            'fingerprint': key['fingerprint'],
+        })
 
     return render(request, "device_detail.html", {
         "device": device,
@@ -376,62 +387,31 @@ def decrypt_zip(request):
 def decrypt_encrypted_file(request):
     if request.method == "POST":
         file_id = request.POST.get("fileId")
-        private_key_id = request.POST.get("privateKeyId")  # ID de la clave privada seleccionada
+        passphrase = request.POST.get("passphrase")  # ID de la clave privada seleccionada
 
         try:
             # Obtener el archivo ZIP de la base de datos
             encrypted_file_instance = get_object_or_404(File, id=file_id, encryption="encrypted")
-            zip_file_path = encrypted_file_instance.file.path
-
-            # Obtener la clave privada de la base de datos
-            private_key_instance = get_object_or_404(PrivateKey, id=private_key_id)
-            private_key = RSA.import_key(private_key_instance.key.read())  # Corregido aquí
-
-            # Extraer los archivos del ZIP
-            with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
-                temp_dir = os.path.splitext(zip_file_path)[0]  # Crear un directorio temporal
-                zip_ref.extractall(temp_dir)
-
-            # Leer los archivos auxiliares
-            iv_path = os.path.join(temp_dir, "iv.bin")
-            encrypted_key_path = os.path.join(temp_dir, "encrypted_key.bin")
-            encrypted_file_path = os.path.join(temp_dir, "encripted.pcap")
-
-            with open(iv_path, "r") as iv_file:
-                iv = bytes.fromhex(iv_file.read())
-
-            with open(encrypted_key_path, "rb") as key_file:
-                encrypted_key = key_file.read()
-
-            # Desencriptar la clave con la clave privada
-            cipher_rsa = PKCS1_v1_5.new(private_key)
-            key = cipher_rsa.decrypt(encrypted_key, None)
-
-            # Desencriptar el archivo principal
-            with open(encrypted_file_path, "rb") as enc_file:
-                encrypted_data = enc_file.read()
-
-            cipher_aes = AES.new(key, AES.MODE_CBC, iv)
-            decrypted_data = unpad(cipher_aes.decrypt(encrypted_data), AES.block_size)
-
-            # Crear un nuevo archivo desencriptado en la base de datos
+            file_path = encrypted_file_instance.file.path
             match = re.search(r"_(\d{8}_\d{6})", encrypted_file_instance.name)
             timestamp = match.group(1)
             decrypted_file_name = f"capture_{timestamp}.pcap"
+            with open(file_path, "rb") as f:
+                state=gpg.decrypt_file(f, passphrase=passphrase)
+                if not state.ok:
+                    return JsonResponse({"error": "Decryption failed. Check the passphrase"}, status=400)
+
+            # Crear un nuevo archivo desencriptado en la base de datos
 
             new_file_instance = File(
                 name=decrypted_file_name,
                 device=encrypted_file_instance.device,
-                file=ContentFile(decrypted_data, name=decrypted_file_name),
+                file=ContentFile(state.data, name=decrypted_file_name),
             )
             new_file_instance.save()
 
-            # Eliminar el archivo ZIP original y el directorio temporal
+             # Eliminar el archivo GPG original
             encrypted_file_instance.delete()
-            os.remove(zip_file_path)
-            for file in os.listdir(temp_dir):
-                os.remove(os.path.join(temp_dir, file))
-            os.rmdir(temp_dir)
 
             return JsonResponse({"message": "File decrypted successfully."})
         except Exception as e:
@@ -446,31 +426,116 @@ def users(request):
 
 @login_required
 def private_keys(request):
-    private_keys = PrivateKey.objects.all().order_by("id")
-    for key in private_keys:
-        key.basename = os.path.basename(key.key.name) 
+    private_keys = []
+    for key in gpg.list_keys():
+        # Mapear el algoritmo a un nombre legible
+        algorithm = "RSA" if key['algo'] == "1" else "DSA" if key['algo'] == "2" else "Unknown"
+
+        # Obtener la fecha de expiración
+        expires = key.get('expires')
+        expiration_date = (
+            datetime.utcfromtimestamp(int(expires)).strftime('%Y-%m-%d') if expires else "No expiration"
+        )
+        
+        private_keys.append({
+            'real_name': key['uids'][0].split('<')[0].strip(),
+            'keyid': key['keyid'],
+            'email': key['uids'][0].split('<')[1].strip('>'),
+            'algorithm': algorithm,
+            'key_size': key['length'],
+            'expiration_date': expiration_date,
+            'fingerprint': key['fingerprint'],
+        })
     return render(request, "private_keys.html", {"private_keys": private_keys})
 
 
 @login_required
 def delete_private_key(request, key_id):
     if request.method == "POST":
-        private_key = get_object_or_404(PrivateKey, id=key_id)
-        private_key.delete()
+        passphrase = request.POST.get("passphrase")  # Obtener el passphrase del formulario
+        if not passphrase:
+            return JsonResponse({"error": "Passphrase is required."}, status=400)
+
+        # Intentar eliminar la clave privada
+        result_private = gpg.delete_keys(key_id, True,expect_passphrase=False)
+        if result_private.status != "ok":
+            return JsonResponse({"error": f"Failed to delete private key: {result_private.stderr}"}, status=400)
+
+        # Intentar eliminar la clave pública
+        result_public = gpg.delete_keys(key_id, False)
+        if result_public.status != "ok":
+            return JsonResponse({"error": f"Failed to delete public key: {result_public.stderr}"}, status=400)
+
+        return JsonResponse({"message": "Private key deleted successfully."})
+
     return redirect("monitorize:private_keys")
 
 @login_required
-def edit_private_key(request,key_id):
-    if request.method == "POST":
-        private_key = get_object_or_404(PrivateKey, id=key_id)
-        form = PrivateKeyChangeForm(request.POST, request.FILES, instance=private_key)
-        if form.is_valid():
-            form.save()
-            return JsonResponse({"message": "Private key updated successfully."})
-        else:
-            return JsonResponse({"errors": form.errors}, status=400)
-    return redirect("monitorize:private_keys")
+def export_public_key(request, key_id):
+    # Exportar la clave pública
+    public_key = gpg.export_keys(key_id)
+    if not public_key:
+        return JsonResponse({"error": "Failed to export public key."}, status=400)
 
+    # Crear una respuesta para descargar el archivo
+    keys = gpg.list_keys()
+    key_details = next((key for key in keys if key["fingerprint"] == key_id), None)
+    keyid = key_details["keyid"]
+    uid = key_details["uids"][0].replace(" ", "_").replace("<", "").replace(">", "")
+    response = JsonResponse({"error": "Failed to export public key."}, status=400)
+    response = HttpResponse(public_key, content_type="application/pgp-keys")
+    response["Content-Disposition"] = f"attachment; filename=public_key_{keyid}_{uid}.asc"
+
+    return response
+
+@login_required
+def import_gpg_key_to_device(request, hostname, key_id):
+    if request.method == "POST":
+        device = get_object_or_404(Device, hostname=hostname)
+
+        # Verificar credenciales en la sesión
+        username = request.session.get(f"{hostname}_username")
+        password = request.session.get(f"{hostname}_password")
+
+        if not username or not password:
+            return JsonResponse({"error": "Missing credentials"}, status=400)
+
+        try:
+            # Exportar la clave pública
+            public_key = gpg.export_keys(key_id)
+            if not public_key:
+                return JsonResponse({"error": "Failed to export the public key"}, status=400)
+
+            # Conectar al dispositivo mediante SSH
+            ssh_client = paramiko.SSHClient()
+            ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            ssh_client.connect(hostname=device.ip, username=username, password=password)
+
+            # Crear un archivo temporal con la clave pública
+            temp_key_file = f"/tmp/pubkey_{key_id}.asc"
+            with ssh_client.open_sftp() as sftp:
+                with sftp.file(temp_key_file, "w") as remote_file:
+                    remote_file.write(public_key)
+
+            # Importar la clave en el dispositivo
+            stdin, stdout, stderr = ssh_client.exec_command(f"sudo gpg --import {temp_key_file}")
+            error = stderr.read().decode().strip()
+            
+            # Eliminar el archivo temporal
+            ssh_client.exec_command(f"rm {temp_key_file}")
+            ssh_client.close()
+
+            if error and "imported" not in error and "not changed" not in error:
+                return JsonResponse({"error": f"Error importing key: {error}"}, status=400)
+                
+            return JsonResponse({
+                "message": "Key imported successfully",
+            })
+            
+        except Exception as e:
+            return JsonResponse({"error": f"Failed to import key: {str(e)}"}, status=400)
+
+    return JsonResponse({"error": "Invalid request method"}, status=405)
 
 @login_required
 def delete_user(request, user_id):
