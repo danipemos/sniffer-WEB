@@ -133,12 +133,6 @@
                     <p><strong>Algorithm:</strong> <span id="deleteKeyAlgorithm"></span></p>
                     <p><strong>Key Size:</strong> <span id="deleteKeySize"></span></p>
                     <p><strong>Expiration Date:</strong> <span id="deleteKeyExpirationDate"></span></p>
-
-                    <!-- Passphrase Input -->
-                    <div class="form-group mt-3">
-                        <label for="deleteKeyPassphrase">Passphrase</label>
-                        <input type="password" class="form-control" id="deleteKeyPassphrase" name="passphrase" placeholder="Enter passphrase" required>
-                    </div>
                 </div>
                 <div class="modal-footer">
                     <form id="deleteKeyForm" method="POST" action="">
@@ -214,7 +208,6 @@
         document.getElementById('deleteKeyForm').addEventListener('submit', function (e) {
             e.preventDefault();
             const formData = new FormData(this);
-            formData.append("passphrase", document.getElementById('deleteKeyPassphrase').value);
 
             fetch(this.action, {
                 method: "POST",

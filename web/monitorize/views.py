@@ -452,10 +452,6 @@ def private_keys(request):
 @login_required
 def delete_private_key(request, key_id):
     if request.method == "POST":
-        passphrase = request.POST.get("passphrase")  # Obtener el passphrase del formulario
-        if not passphrase:
-            return JsonResponse({"error": "Passphrase is required."}, status=400)
-
         # Intentar eliminar la clave privada
         result_private = gpg.delete_keys(key_id, True,expect_passphrase=False)
         if result_private.status != "ok":
