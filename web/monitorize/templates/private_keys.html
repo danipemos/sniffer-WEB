@@ -61,9 +61,17 @@
     <!-- Floating Add Button -->
     <button class="btn btn-primary rounded-circle position-fixed" 
             style="top: 60px; right: 20px; width: 60px; height: 60px; font-size: 24px;" 
-            data-bs-toggle="modal" data-bs-target="#addKeyModal">
+            data-bs-toggle="modal" data-bs-target="#simpleAddKeyModal">
         <i class="bi bi-plus"></i>
     </button>
+
+    <!-- Botón para subir una clave GPG -->
+    <button class="btn btn-secondary rounded-circle position-fixed" 
+            style="top: 140px; right: 20px; width: 60px; height: 60px; font-size: 24px;" 
+            data-bs-toggle="modal" data-bs-target="#importKeyModal">
+        <i class="bi bi-upload"></i>
+    </button>
+
 
     <!-- Modal for Adding -->
     <div class="modal fade" id="addKeyModal" tabindex="-1" aria-labelledby="addKeyModalLabel" aria-hidden="true">
@@ -111,6 +119,9 @@
                             <input type="text" class="form-control" id="addKeyExpiration" name="expiration_date" placeholder="e.g., 1y, 6m, 2w, 0" required>
                         </div>
                         <button type="submit" class="btn btn-primary mt-3">Add Key</button>
+                        <button type="button" class="btn btn-secondary mt-3" data-bs-dismiss="modal" data-bs-toggle="modal" data-bs-target="#simpleAddKeyModal">
+                            Simplified Options
+                        </button>
                     </form>
                 </div>
             </div>
@@ -139,6 +150,57 @@
                         {% csrf_token %}
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                         <button type="submit" class="btn btn-danger">Delete</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para importar una clave GPG -->
+    <div class="modal fade" id="importKeyModal" tabindex="-1" aria-labelledby="importKeyModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="importKeyModalLabel">Import GPG Key</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="importKeyForm" method="POST" enctype="multipart/form-data" action="{% url 'monitorize:import_gpg_key' %}">
+                        {% csrf_token %}
+                        <div class="form-group">
+                            <label for="gpgKeyFile">Select GPG Key File</label>
+                            <input type="file" class="form-control" id="gpgKeyFile" name="gpg_key_file" accept=".asc,.gpg" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary mt-3">Import Key</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Simplified Modal for Adding Private Key -->
+    <div class="modal fade" id="simpleAddKeyModal" tabindex="-1" aria-labelledby="simpleAddKeyModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="simpleAddKeyModalLabel">Add Private Key</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="simpleAddKeyForm" method="POST" action="{% url 'monitorize:add_private_key' %}">
+                        {% csrf_token %}
+                        <div class="form-group">
+                            <label for="simpleAddKeyName">Name</label>
+                            <input type="text" class="form-control" id="simpleAddKeyName" name="name" placeholder="Enter key name" required>
+                        </div>
+                        <div class="form-group mt-3">
+                            <label for="simpleAddKeyPassphrase">Passphrase</label>
+                            <input type="password" class="form-control" id="simpleAddKeyPassphrase" name="passphrase" placeholder="Enter passphrase" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary mt-3">Add Key</button>
+                        <button type="button" class="btn btn-secondary mt-3" data-bs-dismiss="modal" data-bs-toggle="modal" data-bs-target="#addKeyModal">
+                            Advanced Options
+                        </button>
                     </form>
                 </div>
             </div>
@@ -220,6 +282,57 @@
                     alert(data.error); // Mostrar error si ocurre
                 } else {
                     location.reload(); // Recargar la página si se elimina correctamente
+                }
+            })
+            .catch(error => {
+                alert('An unexpected error occurred. Please try again.');
+            });
+        });
+
+        // Manejar el envío del formulario de importación de clave GPG
+        document.getElementById('importKeyForm').addEventListener('submit', function (e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+
+            fetch(this.action, {
+                method: "POST",
+                body: formData,
+                headers: { "X-CSRFToken": "{{ csrf_token }}" }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert(data.error); // Mostrar error si ocurre
+                } else {
+                    location.reload(); // Recargar la página si se importa correctamente
+                }
+            })
+            .catch(error => {
+                alert('An unexpected error occurred. Please try again.');
+            });
+        });
+
+        document.getElementById('simpleAddKeyForm').addEventListener('submit', function (e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+
+            // Agregar valores predeterminados
+            formData.append('email', `${formData.get('name')}@sniffer.com`);
+            formData.append('algorithm', 'RSA');
+            formData.append('size', 2048);
+            formData.append('expiration_date', '0');
+
+            fetch(this.action, {
+                method: "POST",
+                body: formData,
+                headers: { "X-CSRFToken": "{{ csrf_token }}" }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.errors) {
+                    alert(Object.values(data.errors).join(' '));
+                } else {
+                    location.reload(); // Recargar la página si se añade correctamente
                 }
             })
             .catch(error => {

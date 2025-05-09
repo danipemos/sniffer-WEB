@@ -534,6 +534,27 @@ def import_gpg_key_to_device(request, hostname, key_id):
     return JsonResponse({"error": "Invalid request method"}, status=405)
 
 @login_required
+def import_gpg_key(request):
+    if request.method == "POST":
+        gpg_key_file = request.FILES.get("gpg_key_file")
+        if not gpg_key_file:
+            return JsonResponse({"error": "No file provided"}, status=400)
+
+        try:
+            # Leer el contenido del archivo y procesarlo con GPG
+            key_data = gpg_key_file.read().decode("utf-8")
+            import_result = gpg.import_keys(key_data)
+
+            if not import_result.count:
+                return JsonResponse({"error": "Failed to import GPG key."}, status=400)
+
+            return JsonResponse({"message": "GPG key imported successfully."})
+        except Exception as e:
+            return JsonResponse({"error": f"An error occurred: {str(e)}"}, status=500)
+
+    return JsonResponse({"error": "Invalid request method."}, status=405)
+
+@login_required
 def delete_user(request, user_id):
     if request.method == "POST":
         user = get_object_or_404(User, id=user_id)

@@ -29,4 +29,5 @@ urlpatterns = [
     path("devices/edit/<int:device_id>/", views.edit_device, name="edit_device"),
     path("device/delete_file/<int:file_id>/", views.delete_file, name="delete_file"),
     path('device/<str:hostname>/import_key/<str:key_id>/', views.import_gpg_key_to_device, name='import_gpg_key_to_device'),
+    path('import-gpg-key/', views.import_gpg_key, name='import_gpg_key'),
 ]
