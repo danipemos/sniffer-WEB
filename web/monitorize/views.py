@@ -514,7 +514,7 @@ def import_gpg_key_to_device(request, hostname, key_id):
                     remote_file.write(public_key)
 
             # Importar la clave en el dispositivo
-            stdin, stdout, stderr = ssh_client.exec_command(f"sudo gpg --import {temp_key_file}")
+            stdin, stdout, stderr = ssh_client.exec_command(f"sudo gpg --homedir=/etc/sniffer/.gnupg --import {temp_key_file}")
             error = stderr.read().decode().strip()
             
             # Eliminar el archivo temporal
