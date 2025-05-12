@@ -24,4 +24,5 @@ Aplication web based on django to monitorize "nombre sniffer" a service that cap
     docker compose docker-compose.yml
 3. Open a terminal in the docker container
 
-
+## LICENSE
+./LICENSE
