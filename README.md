@@ -18,7 +18,7 @@ Web application based on Django to monitor "nombre sniffer", a service that capt
 1. Clone the repository
    ```bash
    poner link
-   cd docker
+   cd carpeta
 2. Go to the .devcontainer folder and create the docker containers with docker compose:
     ```bash
     docker compose up -d --build
