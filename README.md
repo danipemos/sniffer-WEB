@@ -25,4 +25,4 @@ Aplication web based on django to monitorize "nombre sniffer" a service that cap
 3. Open a terminal in the docker container
 
 ## LICENSE
-./LICENSE
+GNU General Public License v3.0 or later. See the [LICENSE](LICENSE) file for details.
