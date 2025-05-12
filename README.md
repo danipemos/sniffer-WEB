@@ -1,7 +1,7 @@
 # Titulo
 
 ## Description
-Aplication web based on django to monitorize "nombre sniffer" a service that captures and manages network data remotely
+Aplication web based on django to monitorize "nombre sniffer" a service that captures and manages network data focusing data protection, security and privacy.
 
 ## Key Features
 - User management system that allows for the creation and management of users who are authorized to access the web application.
@@ -18,11 +18,11 @@ Aplication web based on django to monitorize "nombre sniffer" a service that cap
 1. Clone the repository
    ```bash
    poner link
-   cd .devcontainer
+   cd .carpeta
 2. Go to the .devcontainer folder and create the docker containers with docker compose:
     ```bash
+    cd .devcontainer
     docker compose docker-compose.yml
-3. Open a terminal in the docker container
 
 ## LICENSE
 GNU General Public License v3.0 or later. See the [LICENSE](LICENSE) file for details.
