@@ -18,7 +18,7 @@ Aplication web based on django to monitorize "nombre sniffer" a service that cap
 1. Clone the repository
    ```bash
    poner link
-   cd carpeta
+   cd .devcontainer
 2. Go to the .devcontainer folder and create the docker containers with docker compose:
     ```bash
     docker compose docker-compose.yml
