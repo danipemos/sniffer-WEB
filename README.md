@@ -1,18 +1,18 @@
 # Titulo
 
 ## Description
-Aplication web based on django to monitorize "nombre sniffer" a service that captures and manages network data focusing data protection, security and privacy.
+Web application based on Django to monitor "nombre sniffer", a service that captures and manages network data with a focus on data protection, security, and privacy.
 
 ## Key Features
-- User management system that allows for the creation and management of users who are authorized to access the web application.
-- GPG management system that allows for the creation and management of the gpg keys used to cypher the captures files.
-- Device magement system to monitorize the execution of the service, it includes:
-  - Modification of the config.ini file
-  - Open a ssh termial to the device
-  - Start and stop the sniffer.service
-  - View in real time the stadistics of the execution of the service.
-  - Recive, decrypt and download the captured files.
-  - Send the public gpg key to the device and add it to the ring.
+- User management system: Allows the creation and management of users authorized to access the web application.
+- GPG key management: Enables the creation and management of GPG keys used to encrypt the captured files.
+- Device management system to monitor the service execution, including:
+  - Editing the config.ini file
+  - Opening an SSH terminal to the device
+  - Starting and stopping the sniffer.service
+  - Viewing real-time execution statistics
+  - Receiving, decrypting, and downloading captured files
+  - Sending the public GPG key to the device and adding it to the keyring
 
 ## Instalation
 1. Clone the repository
