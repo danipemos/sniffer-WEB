@@ -1,7 +1,6 @@
 FROM python:latest
 
 ENV PYTHONUNBUFFERED 1
-
 RUN mkdir /workspace
 WORKDIR /workspace
 
@@ -17,3 +16,7 @@ RUN if [ -f "development.txt" ]; then pip install --no-cache-dir -r development.
 RUN apt-get autoremove -y \
     && apt-get clean -y \
     && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspace/web
+
+ENTRYPOINT ./docker-entrypoint.sh && \ daphne -b 0.0.0.0 -p 8000 web.asgi:application
