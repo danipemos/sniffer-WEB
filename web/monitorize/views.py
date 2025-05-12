@@ -11,11 +11,6 @@ from channels.layers import get_channel_layer
 import json
 from django.core.files.base import ContentFile
 import pyzipper
-from Crypto.Cipher import AES, PKCS1_v1_5
-from Crypto.Util.Padding import unpad
-from Crypto.PublicKey import RSA
-import os
-import zipfile
 import re
 from django.contrib.auth import get_user_model
 import gnupg
