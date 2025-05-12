@@ -3,7 +3,7 @@
 ## Description
 Aplication web based on django to monitorize "nombre sniffer"
 
-##Key Features
+## Key Features
 -User management system that allows for the creation and management of users who are authorized to access the web application.
 -GPG management system that allows for the creation and management of the gpg keys used to cypher the captures files.
 -Device magement system to monitorize the execution of the service, it includes:
@@ -14,7 +14,7 @@ Aplication web based on django to monitorize "nombre sniffer"
   -Recive, decrypt and download the captured files.
   -Send the public gpg key to the device and add it to the ring.
 
-##Instalation
+## Instalation
 1. Clone the repository
    ```bash
    poner link
