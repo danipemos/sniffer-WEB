@@ -1,7 +1,7 @@
 import asyncio
 import paramiko
-import re
 import json
+import io
 from channels.generic.websocket import AsyncWebsocketConsumer
 from asgiref.sync import sync_to_async
 from .models import Device
@@ -9,7 +9,6 @@ from .models import Device
 class SSHConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         self.hostname = self.scope['url_route']['kwargs']['hostname']
-
         self.ssh_client = None
         self.channel = None
 
@@ -19,15 +18,8 @@ class SSHConsumer(AsyncWebsocketConsumer):
         # Obtener los detalles del dispositivo
         self.device = await sync_to_async(Device.objects.get)(hostname=self.hostname)
 
-        # Obtener credenciales de cookies
-        session = self.scope["session"]
-        username = session.get(f"{self.hostname}_username")
-        password = session.get(f"{self.hostname}_password")
-
-        if not username or not password:
-            await self.send(text_data="Error: Missing credentials.")
-            await self.close()
-            return
+        private_key_str = self.device.ssh_private_key
+        private_key = paramiko.RSAKey.from_private_key(io.StringIO(private_key_str))
 
         try:
             # Configurar la conexión SSH
@@ -35,8 +27,8 @@ class SSHConsumer(AsyncWebsocketConsumer):
             self.ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             self.ssh_client.connect(
                 hostname=self.device.ip,
-                username=username,
-                password=password
+                username="sniffer",
+                pkey=private_key
             )
 
             # Abrir un canal interactivo
@@ -104,3 +96,18 @@ class FileConsumer(AsyncWebsocketConsumer):
         # Enviar información del nuevo archivo al cliente
         file_data = event['data']
         await self.send(text_data=json.dumps({'type': 'new_file', 'data': file_data}))
+
+
+class DeviceListConsumer(AsyncWebsocketConsumer):
+    async def connect(self):
+        await self.channel_layer.group_add("devices", self.channel_name)
+        await self.accept()
+
+    async def disconnect(self, close_code):
+        await self.channel_layer.group_discard("devices", self.channel_name)
+
+    async def new_device(self, event):
+        await self.send(text_data=json.dumps({
+            "type": "new_device",
+            "device": event["data"],
+        }))

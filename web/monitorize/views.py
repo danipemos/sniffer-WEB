@@ -17,6 +17,7 @@ import gnupg
 from django.conf import settings
 from datetime import datetime
 from django.http import HttpResponse
+import io
 gpg = gnupg.GPG(gnupghome=settings.GNUPG_HOME)
 
 
@@ -48,72 +49,39 @@ def add_private_key(request):
             return JsonResponse({"errors": form.errors}, status=400)
     return redirect("monitorize:private_keys")
 
-@login_required
+@csrf_exempt
 def add_device(request):
     if request.method == "POST":
         form = DeviceCreationForm(request.POST)
         if form.is_valid():
-            form.save()
-            return JsonResponse({"message": "Device added successfully."})
+            device=form.save()
+            key = paramiko.RSAKey.generate(2048)
+            private_io = io.StringIO()
+            key.write_private_key(private_io)
+            private_key = private_io.getvalue()
+            public_key = f"{key.get_name()} {key.get_base64()}"
+            device.ssh_private_key = private_key
+            device.save()
+            return JsonResponse({"message": "Device added successfully.", "public_key": public_key})
         else:
             return JsonResponse({"errors": form.errors}, status=400)
     else:
         return redirect("monitorize:devices")
     
 @login_required
-def set_credentials(request, hostname):
-    if request.method == "POST":
-        username = request.POST.get("username")
-        password = request.POST.get("password")
-
-        # Verificar si el dispositivo existe
-        device = get_object_or_404(Device, hostname=hostname)
-
-        # Intentar establecer una conexión SSH
-        ssh_client = paramiko.SSHClient()
-        ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        try:
-            ssh_client.connect(
-                hostname=device.ip,
-                username=username,
-                password=password,
-                timeout=10  # Tiempo de espera para la conexión
-            )
-            ssh_client.close()
-
-            # Guardar credenciales en la sesión si la conexión fue exitosa
-            request.session[f"{hostname}_username"] = username
-            request.session[f"{hostname}_password"] = password
-
-            return JsonResponse({"message": "Credentials set successfully."})
-        except Exception as e:
-            return JsonResponse({"error": f"SSH connection failed: {str(e)}"}, status=400)
-
-    return JsonResponse({"error": "Invalid request method."}, status=405)
-
-#@csrf_exempt
-@login_required
 def edit_file(request, hostname):
     device = get_object_or_404(Device, hostname=hostname)
 
-    # Verificar credenciales en la sesión
-    username = request.session.get(f"{hostname}_username")
-    password = request.session.get(f"{hostname}_password")
-
-    if not username or not password:
-        return JsonResponse({"error": "Missing credentials"}, status=400)
-
-    # Ruta fija del archivo
-    file_path = "/home/dani/sniffer/config.ini"
+    # Usar clave privada para la conexión SSH
+    private_key = paramiko.RSAKey.from_private_key(io.StringIO(device.ssh_private_key))
+    file_path = "/home/sniffer/config.ini"
 
     if request.method == "GET":
         try:
-            # Conectar al dispositivo y leer el archivo
             ssh_client = paramiko.SSHClient()
             ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            ssh_client.connect(hostname=device.ip, username=username, password=password)
+            ssh_client.connect(hostname=device.ip, username="sniffer", pkey=private_key)
 
-            # Usar SFTP para leer el archivo
             sftp = ssh_client.open_sftp()
             with sftp.file(file_path, "r") as remote_file:
                 file_content = remote_file.read().decode()
@@ -126,17 +94,13 @@ def edit_file(request, hostname):
 
     elif request.method == "POST":
         file_content = request.POST.get("fileContent")
-
         if not file_content:
             return JsonResponse({"error": "File content is required"}, status=400)
-
         try:
-            # Conectar al dispositivo y guardar el archivo
             ssh_client = paramiko.SSHClient()
             ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            ssh_client.connect(hostname=device.ip, username=username, password=password)
+            ssh_client.connect(hostname=device.ip, username="sniffer", pkey=private_key)
 
-            # Usar SFTP para guardar el archivo
             sftp = ssh_client.open_sftp()
             with sftp.file(file_path, "w") as remote_file:
                 remote_file.write(file_content)
@@ -158,13 +122,6 @@ def device_list(request):
 def device_detail(request, hostname):
     device = get_object_or_404(Device, hostname=hostname)
 
-    # Verificar si las credenciales existen en la sesión
-    username = request.session.get(f"{hostname}_username")
-    password = request.session.get(f"{hostname}_password")
-
-    # Si no existen credenciales, pasar una bandera al template
-    missing_credentials = not username or not password
-
     # Obtener los archivos relacionados con el dispositivo
     encrypted_files = File.objects.filter(device=device, encryption="encrypted")
     zip_files = File.objects.filter(device=device, encryption="zip")
@@ -180,7 +137,6 @@ def device_detail(request, hostname):
 
     return render(request, "device_detail.html", {
         "device": device,
-        "missing_credentials": missing_credentials,
         "encrypted_files": encrypted_files,
         "zip_files": zip_files,
         "decrypted_files": decrypted_files,
@@ -190,25 +146,14 @@ def device_detail(request, hostname):
 @login_required
 def service_status(request, hostname):
     device = get_object_or_404(Device, hostname=hostname)
-
-    # Verificar credenciales en la sesión
-    username = request.session.get(f"{hostname}_username")
-    password = request.session.get(f"{hostname}_password")
-
-    if not username or not password:
-        return JsonResponse({"error": "Missing credentials"}, status=400)
-
+    private_key = paramiko.RSAKey.from_private_key(io.StringIO(device.ssh_private_key))
     try:
-        # Conectar al dispositivo mediante SSH
         ssh_client = paramiko.SSHClient()
         ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        ssh_client.connect(hostname=device.ip, username=username, password=password)
-
-        # Ejecutar el comando para verificar el estado del servicio
+        ssh_client.connect(hostname=device.ip, username="sniffer", pkey=private_key)
         stdin, stdout, stderr = ssh_client.exec_command("sudo systemctl is-active sniffer.service")
         status = stdout.read().decode().strip()
         ssh_client.close()
-
         if status == "active":
             return JsonResponse({"status": "active"})
         else:
@@ -216,58 +161,34 @@ def service_status(request, hostname):
     except Exception as e:
         return JsonResponse({"error": f"Failed to check service status: {str(e)}"}, status=400)
 
-
 @login_required
 def start_service(request, hostname):
     device = get_object_or_404(Device, hostname=hostname)
-
-    # Verificar credenciales en la sesión
-    username = request.session.get(f"{hostname}_username")
-    password = request.session.get(f"{hostname}_password")
-
-    if not username or not password:
-        return JsonResponse({"error": "Missing credentials"}, status=400)
-
+    private_key = paramiko.RSAKey.from_private_key(io.StringIO(device.ssh_private_key))
     try:
-        # Conectar al dispositivo mediante SSH
         ssh_client = paramiko.SSHClient()
         ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        ssh_client.connect(hostname=device.ip, username=username, password=password)
-
-        # Ejecutar el comando para iniciar el servicio
+        ssh_client.connect(hostname=device.ip, username="sniffer", pkey=private_key)
         stdin, stdout, stderr = ssh_client.exec_command("sudo systemctl start sniffer.service")
         error = stderr.read().decode().strip()
         ssh_client.close()
-
         if error:
             return JsonResponse({"error": error}, status=400)
         return JsonResponse({"message": "Service started successfully"})
     except Exception as e:
         return JsonResponse({"error": f"Failed to start service: {str(e)}"}, status=400)
 
-
 @login_required
 def stop_service(request, hostname):
     device = get_object_or_404(Device, hostname=hostname)
-
-    # Verificar credenciales en la sesión
-    username = request.session.get(f"{hostname}_username")
-    password = request.session.get(f"{hostname}_password")
-
-    if not username or not password:
-        return JsonResponse({"error": "Missing credentials"}, status=400)
-
+    private_key = paramiko.RSAKey.from_private_key(io.StringIO(device.ssh_private_key))
     try:
-        # Conectar al dispositivo mediante SSH
         ssh_client = paramiko.SSHClient()
         ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        ssh_client.connect(hostname=device.ip, username=username, password=password)
-
-        # Ejecutar el comando para detener el servicio
+        ssh_client.connect(hostname=device.ip, username="sniffer", pkey=private_key)
         stdin, stdout, stderr = ssh_client.exec_command("sudo systemctl stop sniffer.service")
         error = stderr.read().decode().strip()
         ssh_client.close()
-
         if error:
             return JsonResponse({"error": error}, status=400)
         return JsonResponse({"message": "Service stopped successfully"})
@@ -335,7 +256,7 @@ def upload_file(request, hostname):
             device=device,
             file=uploaded_file
         )
-        file_instance.save()  # Esto notificará automáticamente al cliente
+        file_instance.save()
 
         return JsonResponse({"message": "File uploaded successfully"}, status=201)
 
@@ -447,12 +368,13 @@ def private_keys(request):
 @login_required
 def delete_private_key(request, key_id):
     if request.method == "POST":
-        # Intentar eliminar la clave privada
-        result_private = gpg.delete_keys(key_id, True,expect_passphrase=False)
-        if result_private.status != "ok":
-            return JsonResponse({"error": f"Failed to delete private key: {result_private.stderr}"}, status=400)
+        private_keys = gpg.list_keys(secret=True)
+        if any(key['fingerprint'] == key_id for key in private_keys):
+            result_private = gpg.delete_keys(key_id, True,expect_passphrase=False)
+            if result_private.status != "ok":
+                return JsonResponse({"error": f"Failed to delete private key: {result_private.stderr}"}, status=400)
 
-        # Intentar eliminar la clave pública
+
         result_public = gpg.delete_keys(key_id, False)
         if result_public.status != "ok":
             return JsonResponse({"error": f"Failed to delete public key: {result_public.stderr}"}, status=400)
@@ -484,13 +406,6 @@ def import_gpg_key_to_device(request, hostname, key_id):
     if request.method == "POST":
         device = get_object_or_404(Device, hostname=hostname)
 
-        # Verificar credenciales en la sesión
-        username = request.session.get(f"{hostname}_username")
-        password = request.session.get(f"{hostname}_password")
-
-        if not username or not password:
-            return JsonResponse({"error": "Missing credentials"}, status=400)
-
         try:
             # Exportar la clave pública
             public_key = gpg.export_keys(key_id)
@@ -499,8 +414,9 @@ def import_gpg_key_to_device(request, hostname, key_id):
 
             # Conectar al dispositivo mediante SSH
             ssh_client = paramiko.SSHClient()
+            private_key = paramiko.RSAKey.from_private_key(io.StringIO(device.ssh_private_key))
             ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            ssh_client.connect(hostname=device.ip, username=username, password=password)
+            ssh_client.connect(hostname=device.ip, username="sniffer", pkey=private_key)
 
             # Crear un archivo temporal con la clave pública
             temp_key_file = f"/tmp/pubkey_{key_id}.asc"
@@ -509,7 +425,7 @@ def import_gpg_key_to_device(request, hostname, key_id):
                     remote_file.write(public_key)
 
             # Importar la clave en el dispositivo
-            stdin, stdout, stderr = ssh_client.exec_command(f"sudo gpg --homedir=/etc/sniffer/.gnupg --import {temp_key_file}")
+            stdin, stdout, stderr = ssh_client.exec_command(f"gpg --homedir=/home/sniffer/.gnupg --import {temp_key_file}")
             error = stderr.read().decode().strip()
             
             # Eliminar el archivo temporal
@@ -593,3 +509,5 @@ def delete_file(request, file_id):
         file_instance = get_object_or_404(File, id=file_id)
         file_instance.delete()
     return redirect("monitorize:device_detail", hostname=file_instance.device.hostname)
+
+

@@ -10,7 +10,6 @@ urlpatterns = [
     path('add-device/', views.add_device, name='add_device'),
     path("devices/", views.device_list, name="devices"),
     path("devices/<str:hostname>/", views.device_detail, name="device_detail"),
-    path("set-credentials/<str:hostname>/", views.set_credentials, name="set_credentials"),
     path("edit_file/<str:hostname>/", views.edit_file, name="edit_file"),
     path("service_status/<str:hostname>/", views.service_status, name="service_status"),
     path("start_service/<str:hostname>/", views.start_service, name="start_service"),

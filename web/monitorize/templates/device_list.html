@@ -220,6 +220,71 @@
                 }
             });
         });
+
+        // WebSocket para dispositivos
+        const ws_scheme = window.location.protocol === "https:" ? "wss" : "ws";
+        const deviceSocket = new WebSocket(
+            ws_scheme + '://' + window.location.host + '/ws/devices/'
+        );
+
+        deviceSocket.onmessage = function(e) {
+            const data = JSON.parse(e.data);
+            if (data.type === "new_device") {
+                const device = data.device;
+                const tbody = document.querySelector("table tbody");
+
+                // Quitar el mensaje "No devices found" si existe
+                const emptyRow = tbody.querySelector("tr td[colspan='5']");
+                if (emptyRow) {
+                    emptyRow.parentElement.remove();
+                }
+
+                // Crear la nueva fila
+                const row = document.createElement("tr");
+                row.innerHTML = `
+                    <td>${device.id}</td>
+                    <td>${device.hostname}</td>
+                    <td>${device.ip}</td>
+                    <td>${device.descripcion || ""}</td>
+                    <td>
+                        <button class="btn btn-sm btn-warning edit-device" data-id="${device.id}" data-hostname="${device.hostname}" data-ip="${device.ip}" data-description="${device.descripcion || ''}">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <button class="btn btn-sm btn-danger delete-device" data-id="${device.id}" data-hostname="${device.hostname}">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                        <a href="${device.hostname}/" class="btn btn-info btn-sm">View Details</a>
+                    </td>
+                `;
+                tbody.appendChild(row);
+
+                // Volver a asociar los eventos a los nuevos botones
+                row.querySelector('.edit-device').addEventListener('click', function () {
+                    const deviceId = this.getAttribute('data-id');
+                    const hostname = this.getAttribute('data-hostname');
+                    const ip = this.getAttribute('data-ip');
+                    const description = this.getAttribute('data-description');
+                    document.getElementById('editDeviceId').value = deviceId;
+                    document.getElementById('editDeviceHostname').value = hostname;
+                    document.getElementById('editDeviceIP').value = ip;
+                    document.getElementById('editDeviceDescription').value = description;
+                    const editForm = document.getElementById('editDeviceForm');
+                    editForm.action = `{% url 'monitorize:edit_device' 0 %}`.replace("0", deviceId);
+                    const editModal = new bootstrap.Modal(document.getElementById('editDeviceModal'));
+                    editModal.show();
+                });
+
+                row.querySelector('.delete-device').addEventListener('click', function () {
+                    const deviceId = this.getAttribute('data-id');
+                    const hostname = this.getAttribute('data-hostname');
+                    document.getElementById('deleteDeviceHostname').textContent = hostname;
+                    const deleteForm = document.getElementById('deleteDeviceForm');
+                    deleteForm.action = `{% url 'monitorize:delete_device' 0 %}`.replace("0", deviceId);
+                    const deleteModal = new bootstrap.Modal(document.getElementById('deleteDeviceModal'));
+                    deleteModal.show();
+                });
+            }
+        };
     </script>
 </body>
 </html>

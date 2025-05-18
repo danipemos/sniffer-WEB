@@ -1,7 +1,7 @@
 #!/bin/bash
-
+ip route add 10.8.0.0/24 via 10.8.1.4
 echo "making migrations"
-python3 manage.py makemigrations
+python3 manage.py makemigrations users monitorize
 
 echo "migrating"
 python3 manage.py migrate

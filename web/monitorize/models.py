@@ -9,10 +9,29 @@ class Device(models.Model):
     hostname = models.CharField(max_length=255)
     ip = models.GenericIPAddressField()
     descripcion = models.TextField(blank=True, null=True)
+    ssh_private_key = models.TextField(blank=True, null=True)
 
     def __str__(self):
         return self.hostname
     
+    def save(self, *args, **kwargs):
+        is_new = self.pk is None
+        super().save(*args, **kwargs)
+        if is_new:
+            channel_layer = get_channel_layer()
+            async_to_sync(channel_layer.group_send)(
+                "devices",  # Grupo general para la lista de dispositivos
+                {
+                    "type": "new_device",
+                    "data": {
+                        "id": self.id,
+                        "hostname": self.hostname,
+                        "ip": self.ip,
+                        "descripcion": self.descripcion,
+                    },
+                }
+            )
+
 def file_upload_path(instance, filename):
     hostname = instance.device.hostname
 

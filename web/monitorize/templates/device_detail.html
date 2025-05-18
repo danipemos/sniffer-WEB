@@ -228,31 +228,6 @@
         </div>
     </div>
 
-    <!-- Modal para formulario de credenciales -->
-    <div class="modal fade" id="credentialsModal" tabindex="-1" aria-labelledby="credentialsModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="credentialsModalLabel">Set Credentials</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <form id="setCredentialsForm">
-                        <div class="mb-3">
-                            <label for="username" class="form-label">Username</label>
-                            <input type="text" class="form-control" id="username" name="username" required>
-                        </div>
-                        <div class="mb-3">
-                            <label for="password" class="form-label">Password</label>
-                            <input type="password" class="form-control" id="password" name="password" required>
-                        </div>
-                        <button type="submit" class="btn btn-primary">Save Credentials</button>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <!-- Modal para Open SSH Terminal -->
     <div class="modal fade" id="sshTerminalModal" tabindex="-1" aria-labelledby="sshTerminalModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-xl">
@@ -452,46 +427,19 @@
 
     <script>
         document.addEventListener("DOMContentLoaded", function () {
-            const missingCredentials = {{ missing_credentials|yesno:"true,false" }};
             const editFileModal = new bootstrap.Modal(document.getElementById("editFileModal"));
-            const credentialsModal = new bootstrap.Modal(document.getElementById("credentialsModal"));
 
             // Abrir el modal para editar archivo
             document.getElementById("openEditFileModal").addEventListener("click", function () {
-                if (missingCredentials) {
-                    // Mostrar el modal de credenciales si faltan
-                    credentialsModal.show();
-                } else {
-                    // Intentar cargar el contenido del archivo si las credenciales están presentes
-                    fetch(`{% url 'monitorize:edit_file' device.hostname %}`)
-                        .then(response => response.json())
-                        .then(data => {
-                            if (data.error) {
-                                alert(data.error);
-                            } else {
-                                document.getElementById("fileContent").value = data.fileContent;
-                                editFileModal.show();
-                            }
-                        });
-                }
-            });
-
-            // Manejar el envío del formulario de credenciales
-            document.getElementById("setCredentialsForm").addEventListener("submit", function (e) {
-                e.preventDefault();
-                const formData = new FormData(e.target);
-
-                fetch("{% url 'monitorize:set_credentials' device.hostname %}", {
-                    method: "POST",
-                    body: formData,
-                    headers: { "X-CSRFToken": "{{ csrf_token }}" }
-                })
+                // Intentar cargar el contenido del archivo directamente
+                fetch(`{% url 'monitorize:edit_file' device.hostname %}`)
                     .then(response => response.json())
                     .then(data => {
                         if (data.error) {
                             alert(data.error);
                         } else {
-                            location.reload(); // Recargar la página para actualizar el estado de las credenciales
+                            document.getElementById("fileContent").value = data.fileContent;
+                            editFileModal.show();
                         }
                     });
             });
@@ -517,62 +465,46 @@
                     });
             });
 
-            let socket = null; // Declarar el socket fuera del alcance del evento
+            let socket = null;
 
             // Manejar el clic en el botón "Open SSH Terminal"
             document.getElementById("openSshTerminal").addEventListener("click", function () {
-                if (missingCredentials) {
-                    // Mostrar el modal de credenciales si faltan
-                    const credentialsModal = new bootstrap.Modal(document.getElementById("credentialsModal"));
-                    credentialsModal.show();
-                } else {
-                    // Mostrar el modal del terminal si las credenciales están presentes
-                    const sshTerminalModal = new bootstrap.Modal(document.getElementById("sshTerminalModal"));
-                    sshTerminalModal.show();
+                // Mostrar el modal del terminal directamente
+                const sshTerminalModal = new bootstrap.Modal(document.getElementById("sshTerminalModal"));
+                sshTerminalModal.show();
 
-                    // Conectar el WebSocket solo cuando se abra el modal
-                    if (!socket) {
-                        socket = new WebSocket(`ws://${window.location.host}/ws/ssh/{{ device.hostname }}/`);
+                if (!socket) {
+                    socket = new WebSocket(`ws://${window.location.host}/ws/ssh/{{ device.hostname }}/`);
 
-                        // Inicializar xterm.js
-                        const terminalContainer = document.getElementById('terminal-container');
-                        const term = new Terminal({
-                            cursorBlink: true,
-                            cols: 120,
-                            rows: 40,
-                        });
+                    const terminalContainer = document.getElementById('terminal-container');
+                    const term = new Terminal({
+                        cursorBlink: true,
+                        cols: 120,
+                        rows: 40,
+                    });
 
-                        // Usar el complemento fit para ajustar el tamaño
-                        const fitAddon = new FitAddon.FitAddon();
-                        term.loadAddon(fitAddon);
-                        term.open(terminalContainer);
+                    const fitAddon = new FitAddon.FitAddon();
+                    term.loadAddon(fitAddon);
+                    term.open(terminalContainer);
+                    fitAddon.fit();
 
-                        // Ajustar el tamaño del terminal al contenedor
-                        fitAddon.fit();
+                    socket.onmessage = function (event) {
+                        term.write(event.data);
+                    };
 
-                        // Manejar mensajes entrantes
-                        socket.onmessage = function (event) {
-                            term.write(event.data);
-                        };
+                    socket.onclose = function () {
+                        term.write('\r\nConnection closed.');
+                    };
 
-                        socket.onclose = function () {
-                            term.write('\r\nConnection closed.');
-                        };
-
-                        // Enviar datos al servidor
-                        term.onData(data => {
-                            socket.send(data);
-                        });
-
-                    }
+                    term.onData(data => {
+                        socket.send(data);
+                    });
                 }
             });
 
             const startServiceButton = document.getElementById("startServiceButton");
             const stopServiceButton = document.getElementById("stopServiceButton");
-            const statsContainer = document.getElementById("stats-container");
 
-            // Función para actualizar el estado del servicio
             function updateServiceStatus() {
                 fetch(`{% url 'monitorize:service_status' device.hostname %}`)
                     .then(response => response.json())
@@ -599,56 +531,39 @@
                     });
             }
 
-            // Manejar clic en el botón "Start Service"
             startServiceButton.addEventListener("click", function () {
-                if (missingCredentials) {
-                    const credentialsModal = new bootstrap.Modal(document.getElementById("credentialsModal"));
-                    credentialsModal.show();
-                } else {
-                    fetch(`{% url 'monitorize:start_service' device.hostname %}`, {
-                        method: "POST",
-                        headers: { "X-CSRFToken": "{{ csrf_token }}" }
-                    })
-                        .then(response => response.json())
-                        .then(data => {
-                            if (data.error) {
-                                alert(data.error);
-                            } else {
-                                updateServiceStatus();
-                            }
-                        });
-                }
+                fetch(`{% url 'monitorize:start_service' device.hostname %}`, {
+                    method: "POST",
+                    headers: { "X-CSRFToken": "{{ csrf_token }}" }
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.error) {
+                            alert(data.error);
+                        } else {
+                            updateServiceStatus();
+                        }
+                    });
             });
 
-            // Manejar clic en el botón "Stop Service"
             stopServiceButton.addEventListener("click", function () {
-                if (missingCredentials) {
-                    const credentialsModal = new bootstrap.Modal(document.getElementById("credentialsModal"));
-                    credentialsModal.show();
-                } else {
-                    fetch(`{% url 'monitorize:stop_service' device.hostname %}`, {
-                        method: "POST",
-                        headers: { "X-CSRFToken": "{{ csrf_token }}" }
-                    })
-                        .then(response => response.json())
-                        .then(data => {
-                            if (data.error) {
-                                alert(data.error);
-                            } else {
-                                updateServiceStatus();
-                            }
-                        });
-                }
+                fetch(`{% url 'monitorize:stop_service' device.hostname %}`, {
+                    method: "POST",
+                    headers: { "X-CSRFToken": "{{ csrf_token }}" }
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.error) {
+                            alert(data.error);
+                        } else {
+                            updateServiceStatus();
+                        }
+                    });
             });
 
-            // Mostrar mensaje inicial si faltan credenciales
-            if (!missingCredentials) {
-                // Actualizar el estado del servicio al cargar la página
-                updateServiceStatus();
-
-                // Actualizar el estado del servicio cada 5 segundos
-                setInterval(updateServiceStatus, 500);
-            }
+            // Actualizar el estado del servicio al cargar la página
+            updateServiceStatus();
+            setInterval(updateServiceStatus, 500);
 
             const statsSocket = new WebSocket(`ws://${window.location.host}/ws/stats/{{ device.hostname }}/`);
 
@@ -901,7 +816,6 @@ document.addEventListener("DOMContentLoaded", function () {
 <script>
     document.addEventListener("DOMContentLoaded", function () {
         const gpgKeysModal = new bootstrap.Modal(document.getElementById("gpgKeysModal"));
-        const credentialsModal = new bootstrap.Modal(document.getElementById("credentialsModal"));
         const importStatusAlert = document.getElementById("importStatusAlert");
 
         // Manejar clic en el botón "Import to Device"
@@ -909,14 +823,6 @@ document.addEventListener("DOMContentLoaded", function () {
             button.addEventListener("click", function () {
                 const keyId = this.getAttribute("data-key-id");
                 const keyName = this.getAttribute("data-key-name");
-
-                // Verificar si faltan credenciales
-                const missingCredentials = {{ missing_credentials|yesno:"true,false" }};
-                if (missingCredentials) {
-                    gpgKeysModal.hide();
-                    credentialsModal.show();
-                    return;
-                }
 
                 // Realizar la solicitud para importar la clave
                 fetch(`/monitorize/device/${encodeURIComponent('{{ device.hostname }}')}/import_key/${encodeURIComponent(keyId)}/`, {
