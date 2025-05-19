@@ -1,4 +1,4 @@
-# Titulo
+# SNIFFER-WEB
 
 ## Description
 Web application based on Django to monitor "nombre sniffer", a service that captures and manages network data with a focus on data protection, security, and privacy.
