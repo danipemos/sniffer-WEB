@@ -17,11 +17,19 @@ Web application based on Django to monitor "nombre sniffer", a service that capt
 ## Instalation
 1. Clone the repository
    ```bash
-   poner link
-   cd carpeta
-2. Go to the .devcontainer folder and create the docker containers with docker compose:
+   git clone https://github.com/danipemos/sniffer-WEB
+   cd sniffer-WEB
+2. Go to the [docker-compose.yml](docker-compose.yml) and change the WG_HOST enviroment variable for the host IP or hostname:
     ```bash
-    docker compose up -d --build
+    WG_HOST= host ip/hostname
+3. Execute the docker-compose.yml file:
+   ```bash
+   docker compose up -d --build
+ 4. The default user in web application is:
+    ```bash
+    User=admin
+    Password=sniffer
+  5. The default password for the VPN container is sniffer.
 
 ## LICENSE
 GNU General Public License v3.0 or later. See the [LICENSE](LICENSE) file for details.
