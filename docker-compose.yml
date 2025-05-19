@@ -17,8 +17,6 @@ services:
   db:
     image: postgres:latest
     restart: unless-stopped
-    ports:
-      - "5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     environment:
@@ -36,7 +34,7 @@ services:
   wg-easy:
     environment:
       # ⚠️ Change the server's hostname (clients will connect to):
-      - WG_HOST=192.168.1.61
+      - WG_HOST=192.168.107.109
 
       # ⚠️ Change the Web UI Password:
       - PASSWORD_HASH=$$2a$$12$$wWtaTnNE/EoQOcAGEnoECeL2elyhsoJ7.HvV6OWRKdoMu.BgjQj.2
