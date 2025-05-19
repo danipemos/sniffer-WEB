@@ -1,7 +1,7 @@
 # SNIFFER-WEB
 
 ## Description
-Web application based on Django to monitor "nombre sniffer", a service that captures and manages network data with a focus on data protection, security, and privacy.
+Web application based on Django to monitor [sniffer](https://github.com/danipemos/sniffer), a service that captures and manages network data with a focus on data protection, security, and privacy.
 
 ## Key Features
 - User management system: Allows the creation and management of users authorized to access the web application.
