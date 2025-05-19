@@ -34,7 +34,7 @@ services:
   wg-easy:
     environment:
       # ⚠️ Change the server's hostname (clients will connect to):
-      - WG_HOST=192.168.107.109
+      - WG_HOST= enter yout host ip/hostname
 
       # ⚠️ Change the Web UI Password:
       - PASSWORD_HASH=$$2a$$12$$wWtaTnNE/EoQOcAGEnoECeL2elyhsoJ7.HvV6OWRKdoMu.BgjQj.2
